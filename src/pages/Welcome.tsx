@@ -25,34 +25,6 @@ const Welcome: React.FC = () => {
       {/* Mascot and Hero */}
       <div className="flex flex-col items-center my-auto py-4">
         <div className="relative">
-          <div className="absolute -inset-4<dyad-write path="src/pages/Welcome.tsx" description="Pantalla de bienvenida y Splash de Chuplingo inspirada en la original con mascota loro, 8 cursos e inicio rápido">
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ChuplingoMascot } from '../components/mascot/ChuplingoMascot';
-import { useChuplingo } from '../context/ChuplingoContext';
-import { BookOpen, CheckCircle2, BarChart3, ArrowRight } from 'lucide-react';
-
-const Welcome: React.FC = () => {
-  const navigate = useNavigate();
-  const { completeOnboarding } = useChuplingo();
-
-  const handleStart = () => {
-    completeOnboarding();
-    navigate('/');
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-[#F05C54] via-[#F76A62] to-[#F7F8FC] flex flex-col justify-between p-6 text-center select-none">
-      {/* Top Brand Tag */}
-      <div className="pt-6">
-        <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3.5 py-1.5 rounded-full text-white text-xs font-bold uppercase tracking-wider shadow-sm">
-          <span>🦜</span> Preparación Preuniversitaria
-        </div>
-      </div>
-
-      {/* Mascot and Hero */}
-      <div className="flex flex-col items-center my-auto py-4">
-        <div className="relative">
           <div className="absolute -inset-4 bg-white/20 rounded-full blur-2xl pointer-events-none" />
           <ChuplingoMascot mood="happy" size="xl" />
         </div>
