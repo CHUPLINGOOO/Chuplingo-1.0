@@ -15,7 +15,7 @@ import { COURSES, INITIAL_QUESTIONS, LEVEL_THRESHOLDS } from '../data/coursesDat
 import { INITIAL_CHALLENGES } from '../data/challengesData';
 import { INITIAL_ACHIEVEMENTS } from '../data/achievementsData';
 import { toast } from 'sonner';
-import confetti from 'canvas-confetti';
+import { triggerConfetti } from '../utils/confetti';
 
 interface ChuplingoContextType {
   user: UserProfile;
@@ -263,7 +263,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           description: ach.descripcion,
           duration: 4500
         });
-        confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
+        triggerConfetti();
         return { ...ach, desbloqueadoEn: new Date().toISOString() };
       }
       return ach;
@@ -358,7 +358,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       toast.success(`🎯 ¡Meta diaria completada! (+50 XP)`, {
         description: `Racha actual: 🔥 ${newStreak} días continuos.`,
       });
-      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+      triggerConfetti();
     }
 
     if (newLevel > user.nivel) {
@@ -366,7 +366,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       toast.success(`🎉 ¡Subiste de Nivel! Ahora eres Nivel ${newLevel} (${newTitle})`, {
         duration: 5000
       });
-      confetti({ particleCount: 100, spread: 90 });
+      triggerConfetti();
     } else {
       playSoundEffect('complete');
     }
@@ -449,7 +449,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }));
 
     playSoundEffect('complete');
-    confetti({ particleCount: 70, spread: 60 });
+    triggerConfetti();
     toast.success(`🎉 ¡Recompensa reclamada! +${challenge.recompensaXP} XP`);
   };
 
