@@ -1,26 +1,73 @@
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { ChuplingoProvider } from "./context/ChuplingoContext";
+import { MobileContainer } from "./components/layout/MobileContainer";
+import { BottomNav } from "./components/layout/BottomNav";
+
+// Pages
+import Home from "./pages/Home";
+import Welcome from "./pages/Welcome";
+import CoursesList from "./pages/CoursesList";
+import CourseDetail from "./pages/CourseDetail";
+import PracticeSetup from "./pages/PracticeSetup";
+import PracticeQuestionScreen from "./pages/PracticeQuestionScreen";
+import PracticeResults from "./pages/PracticeResults";
+import ChallengesScreen from "./pages/ChallengesScreen";
+import ProgressScreen from "./pages/ProgressScreen";
+import PracticeHistory from "./pages/PracticeHistory";
+import MistakesScreen from "./pages/MistakesScreen";
+import FavoritesScreen from "./pages/FavoritesScreen";
+import AchievementsScreen from "./pages/AchievementsScreen";
+import ProfileScreen from "./pages/ProfileScreen";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+const AppContent = () => {
+  const location = useLocation();
+
+  // Hide bottom nav on specific fullscreen flows like splash or during active question screen
+  const hideBottomNavRoutes = ['/welcome', '/practice'];
+  const shouldHideBottomNav = hideBottomNavRoutes.some(path => location.pathname.startsWith(path));
+
+  return (
+    <MobileContainer hasBottomNav={!shouldHideBottomNav}>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/welcome" element={<Welcome />} />
+        <Route path="/courses" element={<CoursesList />} />
+        <Route path="/courses/:courseId" element={<CourseDetail />} />
+        <Route path="/practice-setup" element={<PracticeSetup />} />
+        <Route path="/practice-setup/:courseId" element={<PracticeSetup />} />
+        <Route path="/practice-setup/:courseId/:topicId" element={<PracticeSetup />} />
+        <Route path="/practice" element={<PracticeQuestionScreen />} />
+        <Route path="/results/:sessionId" element={<PracticeResults />} />
+        <Route path="/challenges" element={<ChallengesScreen />} />
+        <Route path="/progress" element={<ProgressScreen />} />
+        <Route path="/history" element={<PracticeHistory />} />
+        <Route path="/mistakes" element={<MistakesScreen />} />
+        <Route path="/favorites" element={<FavoritesScreen />} />
+        <Route path="/achievements" element={<AchievementsScreen />} />
+        <Route path="/profile" element={<ProfileScreen />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+      {!shouldHideBottomNav && <BottomNav />}
+    </MobileContainer>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <ChuplingoProvider>
+      <TooltipProvider>
+        <Sonner position="top-center" />
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </TooltipProvider>
+    </ChuplingoProvider>
   </QueryClientProvider>
 );
 
