@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useTransition } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   UserProfile, 
   PracticeSession, 
@@ -252,7 +252,82 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const allQuestions = [...INITIAL_QUESTIONS, ...customQuestions];
 
-  // Initialize and listen to Supabase auth state
+  // Helper to load user data from Supabase
+  const loadUserDataFromSupabase = async (userId: string) => {
+    try {
+      // 1. Fetch profile from Supabase
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profile) {
+        const { level, title } = calculateLevelInfo(profile.xp || 0);
+        setUser(prev => ({
+          ...prev,
+          id: userId,
+          nombre: profile.first_name || prev.nombre,
+          apellido: profile.last_name || prev.apellido,
+          xp: profile.xp || 0,
+          nivel: level,
+          tituloNivel: title,
+          rachaActual: profile.current_streak || 0,
+          mejorRacha: profile.best_streak || 0,
+          suscripcion: {
+            ...prev.suscripcion,
+            planId: (profile.plan?.toLowerCase() as PlanId) || 'gratis'
+          }
+        }));
+      }
+
+      // 2. Fetch sessions from Supabase
+      const { data: remoteSessions } = await supabase
+        .from('practice_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('completed_at', { ascending: false });
+
+      if (remoteSessions && remoteSessions.length > 0) {
+        const mappedSessions: PracticeSession[] = remoteSessions.map(s => {
+          const course = COURSES.find(c => c.id === s.course_id);
+          const topic = course?.temas.find(t => t.id === s.topic_id);
+          return {
+            id: s.id,
+            userId: s.user_id,
+            courseId: (s.course_id as CourseId) || undefined,
+            courseName: course?.nombre || 'Simulacro Tipo Admisión',
+            topicId: s.topic_id || undefined,
+            topicName: topic?.nombre || (s.course_id ? 'Práctica General' : 'Multi-curso (8 Áreas)'),
+            mode: (s.mode as any) || 'rapida',
+            fecha: s.completed_at,
+            duracionSegundos: s.duration_seconds || 0,
+            totalPreguntas: s.total_questions || 0,
+            correctas: s.correct_answers || 0,
+            incorrectas: s.incorrect_answers || 0,
+            porcentaje: Number(s.accuracy) || 0,
+            xpGanado: s.xp_earned || 0,
+            attempts: []
+          };
+        });
+        setSessions(mappedSessions);
+      }
+
+      // 3. Fetch favorites from Supabase
+      const { data: remoteFavorites } = await supabase
+        .from('favorites')
+        .select('question_id')
+        .eq('user_id', userId);
+
+      if (remoteFavorites) {
+        setFavoriteQuestionIds(remoteFavorites.map(f => f.question_id));
+      }
+    } catch (err) {
+      console.error('Error fetching Supabase user data', err);
+    }
+  };
+
+  // Listen to Supabase auth state
   useEffect(() => {
     const checkInitialSession = async () => {
       try {
@@ -273,6 +348,8 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             suscripcion: isUserAdmin ? { ...prev.suscripcion, planId: 'vip' } : prev.suscripcion,
             onboardingCompletado: true
           }));
+
+          loadUserDataFromSupabase(session.user.id);
         }
       } catch (err) {
         console.error('Error fetching Supabase session', err);
@@ -298,6 +375,8 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           suscripcion: isUserAdmin ? { ...prev.suscripcion, planId: 'vip' } : prev.suscripcion,
           onboardingCompletado: true
         }));
+
+        loadUserDataFromSupabase(session.user.id);
       } else if (event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
         setUser(INITIAL_USER);
@@ -370,7 +449,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         osc.stop(ctx.currentTime + 0.5);
       }
     } catch {
-      // Ignored if browser audio policy restricts
+      // Ignored if audio context is blocked
     }
   };
 
@@ -409,7 +488,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setIsAuthenticated(true);
       toast.success('¡Registro exitoso! Revisa tu correo de confirmación.');
       return true;
-    } catch (err: unknown) {
+    } catch {
       toast.error('Ocurrió un problema de conexión al registrarse');
       return false;
     }
@@ -445,7 +524,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setIsAuthenticated(true);
       toast.success(`¡Bienvenido de nuevo, ${meta.first_name || 'Estudiante'}!`);
       return true;
-    } catch (err: unknown) {
+    } catch {
       toast.error('Ocurrió un error al iniciar sesión');
       return false;
     }
@@ -583,7 +662,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // Plan Management
-  const changeUserPlan = (planId: PlanId) => {
+  const changeUserPlan = async (planId: PlanId) => {
     const nextMonth = new Date();
     nextMonth.setMonth(nextMonth.getMonth() + 1);
 
@@ -597,6 +676,17 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         proveedor: planId === 'gratis' ? undefined : 'Pasarela de Pago'
       }
     }));
+
+    if (isAuthenticated && !user.id.startsWith('guest-')) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({ plan: planId.toUpperCase(), updated_at: new Date().toISOString() })
+          .eq('id', user.id);
+      } catch (err) {
+        console.error('Error updating plan in Supabase', err);
+      }
+    }
 
     playSoundEffect('complete');
     triggerConfetti();
@@ -752,6 +842,60 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setUser(updatedUser);
     setSessions(prev => [newSession, ...prev]);
 
+    // Asynchronously sync session to Supabase if authenticated
+    if (isAuthenticated && !user.id.startsWith('guest-')) {
+      (async () => {
+        try {
+          // 1. Insert practice_session
+          const { data: dbSession } = await supabase
+            .from('practice_sessions')
+            .insert({
+              user_id: user.id,
+              course_id: sessionData.courseId || null,
+              topic_id: sessionData.topicId || null,
+              mode: sessionData.mode,
+              total_questions: sessionData.totalPreguntas,
+              correct_answers: sessionData.correctas,
+              incorrect_answers: sessionData.incorrectas,
+              accuracy: sessionData.porcentaje,
+              duration_seconds: sessionData.duracionSegundos,
+              xp_earned: sessionXP,
+              completed_at: new Date().toISOString()
+            })
+            .select('id')
+            .single();
+
+          // 2. Insert attempts if session was inserted
+          if (dbSession?.id && sessionData.attempts.length > 0) {
+            const attemptPayloads = sessionData.attempts.map(att => ({
+              user_id: user.id,
+              session_id: dbSession.id,
+              question_id: att.questionId,
+              selected_answer: att.respuestaSeleccionada,
+              is_correct: att.esCorrecta,
+              time_seconds: att.tiempoSegundos
+            }));
+
+            await supabase.from('attempts').insert(attemptPayloads);
+          }
+
+          // 3. Update user profile stats in Supabase
+          await supabase
+            .from('profiles')
+            .update({
+              xp: newXP,
+              level: newLevel,
+              current_streak: newStreak,
+              best_streak: newBestStreak,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', user.id);
+        } catch (err) {
+          console.error('Error saving practice session to Supabase', err);
+        }
+      })();
+    }
+
     // Check achievements
     const allSessionsList = [newSession, ...sessions];
     const totalQ = allSessionsList.reduce((acc, s) => acc + s.totalPreguntas, 0);
@@ -769,10 +913,20 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (prev.includes(questionId)) {
         isFav = false;
         toast.info('Pregunta eliminada de favoritos');
+
+        if (isAuthenticated && !user.id.startsWith('guest-')) {
+          supabase.from('favorites').delete().match({ user_id: user.id, question_id: questionId });
+        }
+
         return prev.filter(id => id !== questionId);
       } else {
         isFav = true;
         toast.success('⭐ Pregunta guardada en tus favoritos');
+
+        if (isAuthenticated && !user.id.startsWith('guest-')) {
+          supabase.from('favorites').insert({ user_id: user.id, question_id: questionId });
+        }
+
         return [...prev, questionId];
       }
     });
@@ -789,16 +943,31 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         ...prefs
       }
     }));
+
+    if (isAuthenticated && !user.id.startsWith('guest-') && prefs.metaDiaria) {
+      supabase.from('profiles').update({ daily_goal: prefs.metaDiaria }).eq('id', user.id);
+    }
+
     toast.success('Preferencias guardadas');
   };
 
   const updateUserName = (name: string, lastName?: string) => {
     if (!name.trim()) return;
+    const finalLastName = lastName !== undefined ? lastName.trim() : user.apellido;
     setUser(prev => ({ 
       ...prev, 
       nombre: name.trim(),
-      apellido: lastName !== undefined ? lastName.trim() : prev.apellido 
+      apellido: finalLastName 
     }));
+
+    if (isAuthenticated && !user.id.startsWith('guest-')) {
+      supabase.from('profiles').update({
+        first_name: name.trim(),
+        last_name: finalLastName,
+        updated_at: new Date().toISOString()
+      }).eq('id', user.id);
+    }
+
     toast.success('Perfil actualizado');
   };
 
@@ -816,6 +985,14 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       nivel: newLevel,
       tituloNivel: newTitle
     }));
+
+    if (isAuthenticated && !user.id.startsWith('guest-')) {
+      supabase.from('profiles').update({
+        xp: newXP,
+        level: newLevel,
+        updated_at: new Date().toISOString()
+      }).eq('id', user.id);
+    }
 
     playSoundEffect('complete');
     triggerConfetti();
