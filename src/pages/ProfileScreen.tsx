@@ -9,7 +9,6 @@ import {
   Award, 
   Target, 
   Volume2, 
-  Bell, 
   Shield, 
   RotateCcw, 
   ChevronRight,
@@ -18,9 +17,7 @@ import {
   CreditCard,
   Download,
   LogOut,
-  Mail,
-  Lock,
-  UserCheck
+  Mail
 } from 'lucide-react';
 import { LEVEL_THRESHOLDS } from '../data/coursesData';
 import { toast } from 'sonner';
@@ -35,13 +32,12 @@ const ProfileScreen: React.FC = () => {
     updateUserEmail,
     updateUserPassword,
     updateUserPreferences, 
-    resetAllProgress,
     logoutUser,
     deleteUserAccount,
     exportUserDataJSON
   } = useChuplingo();
   
-  const { totalSessions, totalQuestions, overallAccuracy } = getOverallStats();
+  const { totalQuestions, overallAccuracy } = getOverallStats();
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(user.nombre);
@@ -76,23 +72,25 @@ const ProfileScreen: React.FC = () => {
     toast.success('Tus datos de práctica se han descargado correctamente');
   };
 
-  const handleChangeEmail = (e: React.FormEvent) => {
+  const handleChangeEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmailInput.includes('@')) {
       toast.error('Ingresa un correo válido');
       return;
     }
-    updateUserEmail(newEmailInput);
-    setNewEmailInput('');
+    const ok = await updateUserEmail(newEmailInput);
+    if (ok) {
+      setNewEmailInput('');
+    }
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPasswordInput.length < 8) {
       toast.error('La nueva contraseña debe tener al menos 8 caracteres');
       return;
     }
-    const ok = updateUserPassword(oldPasswordInput, newPasswordInput);
+    const ok = await updateUserPassword(oldPasswordInput, newPasswordInput);
     if (ok) {
       setOldPasswordInput('');
       setNewPasswordInput('');
@@ -310,18 +308,6 @@ const ProfileScreen: React.FC = () => {
           </button>
         </div>
 
-        {/* Email templates previewer link */}
-        <button
-          onClick={() => navigate('/email-templates')}
-          className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-slate-50 text-[#183153] font-bold text-xs border border-slate-200 flex items-center justify-between"
-        >
-          <div className="flex items-center gap-2">
-            <Mail className="w-4 h-4 text-[#12B7E8]" />
-            <span>Previsualizar correos transaccionales</span>
-          </div>
-          <ChevronRight className="w-4 h-4 text-slate-400" />
-        </button>
-
         {/* Export Data */}
         <button
           onClick={handleExportData}
@@ -395,8 +381,8 @@ const ProfileScreen: React.FC = () => {
         {/* Logout & Delete Account */}
         <div className="pt-2 flex flex-col gap-2">
           <button
-            onClick={() => {
-              logoutUser();
+            onClick={async () => {
+              await logoutUser();
               navigate('/login');
             }}
             className="w-full py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-[#183153] font-black text-xs flex items-center justify-center gap-2 transition-colors"
@@ -406,9 +392,9 @@ const ProfileScreen: React.FC = () => {
           </button>
 
           <button
-            onClick={() => {
+            onClick={async () => {
               if (window.confirm('¿Estás seguro de que deseas eliminar tu cuenta permanentemente? Se borrarán todos tus datos.')) {
-                deleteUserAccount();
+                await deleteUserAccount();
                 navigate('/welcome');
               }
             }}

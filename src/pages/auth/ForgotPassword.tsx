@@ -13,20 +13,23 @@ const ForgotPassword: React.FC = () => {
   const [step, setStep] = useState<'request' | 'reset'>('request');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleRequest = (e: React.FormEvent) => {
+  const handleRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.includes('@')) {
       toast.error('Ingresa un correo válido');
       return;
     }
-    const sent = requestPasswordReset(email);
+    setLoading(true);
+    const sent = await requestPasswordReset(email);
+    setLoading(false);
     if (sent) {
       setStep('reset');
     }
   };
 
-  const handleReset = (e: React.FormEvent) => {
+  const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword.length < 8) {
       toast.error('La nueva contraseña debe tener mínimo 8 caracteres');
@@ -37,7 +40,9 @@ const ForgotPassword: React.FC = () => {
       return;
     }
 
-    const success = resetUserPassword(email, newPassword);
+    setLoading(true);
+    const success = await resetUserPassword(email, newPassword);
+    setLoading(false);
     if (success) {
       navigate('/login');
     }
@@ -79,9 +84,10 @@ const ForgotPassword: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full mt-2 py-4 px-6 rounded-2xl bg-[#F05C54] hover:bg-[#E04B43] text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
+              disabled={loading}
+              className="w-full mt-2 py-4 px-6 rounded-2xl bg-[#F05C54] hover:bg-[#E04B43] disabled:opacity-60 text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
             >
-              <span>Enviar Enlace de Recuperación</span>
+              <span>{loading ? 'Enviando...' : 'Enviar Enlace de Recuperación'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
@@ -127,10 +133,11 @@ const ForgotPassword: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full mt-2 py-4 px-6 rounded-2xl bg-[#67C66A] hover:bg-[#58B25B] text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
+              disabled={loading}
+              className="w-full mt-2 py-4 px-6 rounded-2xl bg-[#67C66A] hover:bg-[#58B25B] disabled:opacity-60 text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Guardar Nueva Contraseña</span>
+              <span>{loading ? 'Guardando...' : 'Guardar Nueva Contraseña'}</span>
             </button>
           </form>
         )}

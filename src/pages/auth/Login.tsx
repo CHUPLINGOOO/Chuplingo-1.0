@@ -13,8 +13,9 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email.trim() || !password) {
@@ -22,7 +23,10 @@ const Login: React.FC = () => {
       return;
     }
 
-    const success = loginUser({ email, password });
+    setLoading(true);
+    const success = await loginUser({ email, password });
+    setLoading(false);
+
     if (success) {
       navigate('/');
     }
@@ -107,9 +111,10 @@ const Login: React.FC = () => {
 
           <button
             type="submit"
-            className="w-full mt-2 py-4 px-6 rounded-2xl bg-[#183153] hover:bg-[#10223A] text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
+            disabled={loading}
+            className="w-full mt-2 py-4 px-6 rounded-2xl bg-[#183153] hover:bg-[#10223A] disabled:opacity-60 text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
           >
-            <span>Iniciar Sesión</span>
+            <span>{loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
@@ -121,7 +126,7 @@ const Login: React.FC = () => {
             <span>Acceso rápido de prueba / Administrador:</span>
           </div>
           <p className="text-[10px] text-amber-800">
-            Admin: <code>admin@chuplingo.pe</code> / Clave: <code>Admin1234</code>
+            Admin: <code>admin@chuplingo.pe</code>
           </p>
         </div>
 

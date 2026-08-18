@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useChuplingo } from '../../context/ChuplingoContext';
 import { ChuplingoMascot } from '../../components/mascot/ChuplingoMascot';
-import { Eye, EyeOff, Lock, Mail, User, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, User, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Register: React.FC = () => {
@@ -16,6 +16,7 @@ const Register: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Password strength check
   const getPasswordStrength = (pass: string) => {
@@ -31,7 +32,7 @@ const Register: React.FC = () => {
   const strengthLabels = ['Muy débil', 'Débil', 'Aceptable', 'Buena', 'Excelente'];
   const strengthColors = ['bg-rose-400', 'bg-orange-400', 'bg-amber-400', 'bg-emerald-400', 'bg-emerald-600'];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!nombre.trim() || !apellido.trim()) {
@@ -59,12 +60,14 @@ const Register: React.FC = () => {
       return;
     }
 
-    const success = registerUser({
+    setLoading(true);
+    const success = await registerUser({
       nombre,
       apellido,
       email,
       password
     });
+    setLoading(false);
 
     if (success) {
       navigate(`/verify-email?email=${encodeURIComponent(email)}`);
@@ -216,9 +219,10 @@ const Register: React.FC = () => {
 
           <button
             type="submit"
-            className="w-full mt-3 py-4 px-6 rounded-2xl bg-[#F05C54] hover:bg-[#E04B43] text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
+            disabled={loading}
+            className="w-full mt-3 py-4 px-6 rounded-2xl bg-[#F05C54] hover:bg-[#E04B43] disabled:opacity-60 text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
           >
-            <span>Crear Cuenta Gratis</span>
+            <span>{loading ? 'Creando cuenta...' : 'Crear Cuenta Gratis'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>

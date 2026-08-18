@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useTransition } from 'react';
 import { 
   UserProfile, 
   PracticeSession, 
@@ -16,15 +16,9 @@ import {
 import { COURSES, INITIAL_QUESTIONS, LEVEL_THRESHOLDS } from '../data/coursesData';
 import { INITIAL_CHALLENGES } from '../data/challengesData';
 import { INITIAL_ACHIEVEMENTS } from '../data/achievementsData';
+import { supabase } from '../integrations/supabase/client';
 import { toast } from 'sonner';
 import { triggerConfetti } from '../utils/confetti';
-
-interface AuthCredentials {
-  nombre: string;
-  apellido: string;
-  email: string;
-  passwordHash: string;
-}
 
 interface ChuplingoContextType {
   user: UserProfile;
@@ -37,15 +31,15 @@ interface ChuplingoContextType {
   claimedChallengeIds: string[];
   notifications: NotificationItem[];
   // Auth Operations
-  registerUser: (data: { nombre: string; apellido: string; email: string; password: string }) => boolean;
-  loginUser: (data: { email: string; password: string }) => boolean;
-  verifyUserEmail: (email?: string) => void;
-  requestPasswordReset: (email: string) => boolean;
-  resetUserPassword: (email: string, newPassword: string) => boolean;
-  updateUserEmail: (newEmail: string) => boolean;
-  updateUserPassword: (oldPassword: string, newPassword: string) => boolean;
-  logoutUser: () => void;
-  deleteUserAccount: () => void;
+  registerUser: (data: { nombre: string; apellido: string; email: string; password: string }) => Promise<boolean>;
+  loginUser: (data: { email: string; password: string }) => Promise<boolean>;
+  verifyUserEmail: (email?: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<boolean>;
+  resetUserPassword: (email: string, newPassword: string) => Promise<boolean>;
+  updateUserEmail: (newEmail: string) => Promise<boolean>;
+  updateUserPassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
+  logoutUser: () => Promise<void>;
+  deleteUserAccount: () => Promise<void>;
   exportUserDataJSON: () => string;
   // Session & Practice
   recordSession: (sessionData: Omit<PracticeSession, 'id' | 'userId' | 'fecha' | 'xpGanado'>) => PracticeSession;
@@ -83,8 +77,7 @@ interface ChuplingoContextType {
 }
 
 const STORAGE_KEYS = {
-  USER: 'chuplingo_user_v2.0',
-  AUTH_DB: 'chuplingo_auth_accounts_v2.0',
+  USER_STATS: 'chuplingo_user_stats_v2.0',
   SESSIONS: 'chuplingo_sessions_v2.0',
   FAVORITES: 'chuplingo_favorites_v2.0',
   MISTAKES: 'chuplingo_mistakes_v2.0',
@@ -103,16 +96,6 @@ const getYesterdayDateString = (): string => {
   const d = new Date();
   d.setDate(d.getDate() - 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-
-const simpleHash = (str: string): string => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
-  }
-  return `hash_${Math.abs(hash).toString(16)}`;
 };
 
 const calculateLevelInfo = (xp: number) => {
@@ -176,7 +159,7 @@ const ChuplingoContext = createContext<ChuplingoContextType | undefined>(undefin
 export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.USER);
+      const stored = localStorage.getItem(STORAGE_KEYS.USER_STATS);
       if (stored) {
         const parsed: UserProfile = JSON.parse(stored);
         const today = getTodayDateString();
@@ -188,14 +171,12 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return parsed;
       }
     } catch (e) {
-      console.error('Error loading user from localStorage', e);
+      console.error('Error loading user stats from localStorage', e);
     }
     return INITIAL_USER;
   });
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return user.id !== 'guest-student' || user.onboardingCompletado;
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
   const [sessions, setSessions] = useState<PracticeSession[]>(() => {
     try {
@@ -271,9 +252,66 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const allQuestions = [...INITIAL_QUESTIONS, ...customQuestions];
 
+  // Initialize and listen to Supabase auth state
+  useEffect(() => {
+    const checkInitialSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setIsAuthenticated(true);
+          const meta = session.user.user_metadata || {};
+          const isUserAdmin = session.user.email === 'admin@chuplingo.pe';
+
+          setUser(prev => ({
+            ...prev,
+            id: session.user.id,
+            email: session.user.email || prev.email,
+            emailVerificado: !!session.user.email_confirmed_at,
+            nombre: meta.first_name || meta.nombre || prev.nombre || 'Estudiante',
+            apellido: meta.last_name || meta.apellido || prev.apellido || 'Chuplingo',
+            rol: isUserAdmin ? 'admin' : (prev.rol || 'estudiante'),
+            suscripcion: isUserAdmin ? { ...prev.suscripcion, planId: 'vip' } : prev.suscripcion,
+            onboardingCompletado: true
+          }));
+        }
+      } catch (err) {
+        console.error('Error fetching Supabase session', err);
+      }
+    };
+
+    checkInitialSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setIsAuthenticated(true);
+        const meta = session.user.user_metadata || {};
+        const isUserAdmin = session.user.email === 'admin@chuplingo.pe';
+
+        setUser(prev => ({
+          ...prev,
+          id: session.user.id,
+          email: session.user.email || prev.email,
+          emailVerificado: !!session.user.email_confirmed_at,
+          nombre: meta.first_name || meta.nombre || prev.nombre || 'Estudiante',
+          apellido: meta.last_name || meta.apellido || prev.apellido || 'Chuplingo',
+          rol: isUserAdmin ? 'admin' : (prev.rol || 'estudiante'),
+          suscripcion: isUserAdmin ? { ...prev.suscripcion, planId: 'vip' } : prev.suscripcion,
+          onboardingCompletado: true
+        }));
+      } else if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        setUser(INITIAL_USER);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
   // Local persistence sync
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+    localStorage.setItem(STORAGE_KEYS.USER_STATS, JSON.stringify(user));
   }, [user]);
 
   useEffect(() => {
@@ -332,192 +370,193 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         osc.stop(ctx.currentTime + 0.5);
       }
     } catch {
-      // Ignored if browser policy restricts context before interaction
+      // Ignored if browser audio policy restricts
     }
   };
 
-  // Auth Functions
-  const getAuthDB = (): AuthCredentials[] => {
+  // Auth Functions with Supabase
+  const registerUser = async (data: { nombre: string; apellido: string; email: string; password: string }): Promise<boolean> => {
+    const emailNorm = data.email.trim().toLowerCase();
     try {
-      const db = localStorage.getItem(STORAGE_KEYS.AUTH_DB);
-      return db ? JSON.parse(db) : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const saveAuthDB = (db: AuthCredentials[]) => {
-    localStorage.setItem(STORAGE_KEYS.AUTH_DB, JSON.stringify(db));
-  };
-
-  const registerUser = (data: { nombre: string; apellido: string; email: string; password: string }): boolean => {
-    const emailNorm = data.email.trim().toLowerCase();
-    const db = getAuthDB();
-
-    if (db.some(acc => acc.email === emailNorm)) {
-      toast.error('Ya existe una cuenta con este correo electrónico');
-      return false;
-    }
-
-    const newAcc: AuthCredentials = {
-      nombre: data.nombre.trim(),
-      apellido: data.apellido.trim(),
-      email: emailNorm,
-      passwordHash: simpleHash(data.password)
-    };
-
-    saveAuthDB([...db, newAcc]);
-
-    const newUser: UserProfile = {
-      ...INITIAL_USER,
-      id: `user-${Date.now()}`,
-      nombre: data.nombre.trim(),
-      apellido: data.apellido.trim(),
-      email: emailNorm,
-      emailVerificado: false,
-      creadoEn: new Date().toISOString(),
-      onboardingCompletado: true
-    };
-
-    setUser(newUser);
-    setIsAuthenticated(true);
-    toast.success('¡Registro exitoso! Te enviamos un correo de verificación.');
-    return true;
-  };
-
-  const loginUser = (data: { email: string; password: string }): boolean => {
-    const emailNorm = data.email.trim().toLowerCase();
-    const db = getAuthDB();
-    const acc = db.find(a => a.email === emailNorm);
-
-    if (!acc || acc.passwordHash !== simpleHash(data.password)) {
-      // Admin demo fallback bypass
-      if (emailNorm === 'admin@chuplingo.pe' && data.password === 'Admin1234') {
-        const adminUser: UserProfile = {
-          ...INITIAL_USER,
-          id: 'admin-01',
-          nombre: 'Administrador',
-          apellido: 'Chuplingo',
-          email: 'admin@chuplingo.pe',
-          emailVerificado: true,
-          rol: 'admin',
-          suscripcion: {
-            planId: 'vip',
-            estado: 'activa',
-            fechaInicio: getTodayDateString(),
-            fechaRenovacion: '2029-12-31'
+      const { data: authData, error } = await supabase.auth.signUp({
+        email: emailNorm,
+        password: data.password,
+        options: {
+          data: {
+            first_name: data.nombre.trim(),
+            last_name: data.apellido.trim(),
+            full_name: `${data.nombre.trim()} ${data.apellido.trim()}`
           }
-        };
-        setUser(adminUser);
-        setIsAuthenticated(true);
-        toast.success('Sesión iniciada como Administrador');
-        return true;
+        }
+      });
+
+      if (error) {
+        toast.error(error.message || 'Error al registrar la cuenta');
+        return false;
       }
 
-      toast.error('Correo o contraseña incorrectos');
+      const isConfirmed = !!authData.user?.email_confirmed_at;
+      setUser(prev => ({
+        ...prev,
+        id: authData.user?.id || `user-${Date.now()}`,
+        nombre: data.nombre.trim(),
+        apellido: data.apellido.trim(),
+        email: emailNorm,
+        emailVerificado: isConfirmed,
+        onboardingCompletado: true
+      }));
+
+      setIsAuthenticated(true);
+      toast.success('¡Registro exitoso! Revisa tu correo de confirmación.');
+      return true;
+    } catch (err: unknown) {
+      toast.error('Ocurrió un problema de conexión al registrarse');
       return false;
     }
-
-    const updatedUser: UserProfile = {
-      ...user,
-      id: `user-${simpleHash(emailNorm)}`,
-      nombre: acc.nombre,
-      apellido: acc.apellido,
-      email: acc.email,
-      onboardingCompletado: true
-    };
-
-    setUser(updatedUser);
-    setIsAuthenticated(true);
-    toast.success(`¡Bienvenido de nuevo, ${acc.nombre}!`);
-    return true;
   };
 
-  const verifyUserEmail = (email?: string) => {
+  const loginUser = async (data: { email: string; password: string }): Promise<boolean> => {
+    const emailNorm = data.email.trim().toLowerCase();
+    try {
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
+        email: emailNorm,
+        password: data.password
+      });
+
+      if (error) {
+        toast.error(error.message || 'Correo o contraseña incorrectos');
+        return false;
+      }
+
+      const meta = authData.user?.user_metadata || {};
+      const isUserAdmin = emailNorm === 'admin@chuplingo.pe';
+
+      setUser(prev => ({
+        ...prev,
+        id: authData.user.id,
+        email: authData.user.email || emailNorm,
+        emailVerificado: !!authData.user.email_confirmed_at,
+        nombre: meta.first_name || meta.nombre || prev.nombre || 'Estudiante',
+        apellido: meta.last_name || meta.apellido || prev.apellido || 'Chuplingo',
+        rol: isUserAdmin ? 'admin' : prev.rol,
+        onboardingCompletado: true
+      }));
+
+      setIsAuthenticated(true);
+      toast.success(`¡Bienvenido de nuevo, ${meta.first_name || 'Estudiante'}!`);
+      return true;
+    } catch (err: unknown) {
+      toast.error('Ocurrió un error al iniciar sesión');
+      return false;
+    }
+  };
+
+  const verifyUserEmail = async (email?: string) => {
     const targetEmail = email || user.email;
     setUser(prev => ({ ...prev, email: targetEmail, emailVerificado: true }));
     toast.success('¡Tu cuenta ha sido verificada correctamente!');
     triggerConfetti();
   };
 
-  const requestPasswordReset = (email: string): boolean => {
+  const requestPasswordReset = async (email: string): Promise<boolean> => {
     const emailNorm = email.trim().toLowerCase();
-    const db = getAuthDB();
-    const exists = db.some(a => a.email === emailNorm);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(emailNorm, {
+        redirectTo: `${window.location.origin}/forgot-password`
+      });
 
-    if (exists || emailNorm.includes('@')) {
+      if (error) {
+        toast.error(error.message || 'Error al enviar enlace de recuperación');
+        return false;
+      }
+
       toast.success('Enlace de recuperación enviado. Revisa tu bandeja de entrada.');
       return true;
+    } catch {
+      toast.error('No se pudo procesar la recuperación de contraseña');
+      return false;
     }
-    toast.error('No encontramos una cuenta con ese correo');
-    return false;
   };
 
-  const resetUserPassword = (email: string, newPassword: string): boolean => {
-    const emailNorm = email.trim().toLowerCase();
-    const db = getAuthDB();
-    const idx = db.findIndex(a => a.email === emailNorm);
+  const resetUserPassword = async (email: string, newPassword: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
 
-    if (idx >= 0) {
-      db[idx].passwordHash = simpleHash(newPassword);
-      saveAuthDB(db);
+      if (error) {
+        toast.error(error.message || 'No se pudo restablecer la contraseña');
+        return false;
+      }
+
       toast.success('Contraseña actualizada con éxito');
       return true;
+    } catch {
+      toast.error('Error al actualizar contraseña');
+      return false;
     }
-    toast.error('No se pudo restablecer la contraseña');
-    return false;
   };
 
-  const updateUserEmail = (newEmail: string): boolean => {
+  const updateUserEmail = async (newEmail: string): Promise<boolean> => {
     const emailNorm = newEmail.trim().toLowerCase();
-    const db = getAuthDB();
+    try {
+      const { error } = await supabase.auth.updateUser({
+        email: emailNorm
+      });
 
-    if (db.some(a => a.email === emailNorm && a.email !== user.email)) {
-      toast.error('Ese correo ya está registrado por otro usuario');
+      if (error) {
+        toast.error(error.message || 'Error al actualizar el correo electrónico');
+        return false;
+      }
+
+      setUser(prev => ({ ...prev, email: emailNorm, emailVerificado: false }));
+      toast.success('Correo actualizado. Revisa el mensaje de verificación.');
+      return true;
+    } catch {
+      toast.error('No se pudo actualizar el correo electrónico');
       return false;
     }
-
-    const idx = db.findIndex(a => a.email === user.email);
-    if (idx >= 0) {
-      db[idx].email = emailNorm;
-      saveAuthDB(db);
-    }
-
-    setUser(prev => ({ ...prev, email: emailNorm, emailVerificado: false }));
-    toast.success('Correo actualizado. Revisa el mensaje de verificación.');
-    return true;
   };
 
-  const updateUserPassword = (oldPassword: string, newPassword: string): boolean => {
-    const db = getAuthDB();
-    const acc = db.find(a => a.email === user.email);
+  const updateUserPassword = async (oldPassword: string, newPassword: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
 
-    if (acc && acc.passwordHash !== simpleHash(oldPassword)) {
-      toast.error('La contraseña actual es incorrecta');
+      if (error) {
+        toast.error(error.message || 'Error al cambiar contraseña');
+        return false;
+      }
+
+      toast.success('Tu contraseña ha sido cambiada de forma segura');
+      return true;
+    } catch {
+      toast.error('Error al actualizar contraseña');
       return false;
     }
-
-    if (acc) {
-      acc.passwordHash = simpleHash(newPassword);
-      saveAuthDB(db);
-    }
-
-    toast.success('Tu contraseña ha sido cambiada de forma segura');
-    return true;
   };
 
-  const logoutUser = () => {
+  const logoutUser = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Error on signOut', err);
+    }
     setUser({ ...INITIAL_USER, onboardingCompletado: true });
     setIsAuthenticated(false);
     toast.info('Sesión cerrada');
   };
 
-  const deleteUserAccount = () => {
-    const db = getAuthDB().filter(a => a.email !== user.email);
-    saveAuthDB(db);
+  const deleteUserAccount = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Error deleting account session', err);
+    }
     resetAllProgress();
     setIsAuthenticated(false);
-    toast.success('Tu cuenta ha sido eliminada por completo');
+    toast.success('Tu cuenta ha sido cerrada');
   };
 
   const exportUserDataJSON = (): string => {
@@ -555,7 +594,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         estado: 'activa',
         fechaInicio: getTodayDateString(),
         fechaRenovacion: nextMonth.toISOString().split('T')[0],
-        proveedor: planId === 'gratis' ? undefined : 'Culqi / MercadoPago'
+        proveedor: planId === 'gratis' ? undefined : 'Pasarela de Pago'
       }
     }));
 
