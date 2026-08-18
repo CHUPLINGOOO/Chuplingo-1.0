@@ -17,6 +17,7 @@ import { COURSES, LEVEL_THRESHOLDS } from '../data/coursesData';
 import { INITIAL_CHALLENGES } from '../data/challengesData';
 import { INITIAL_ACHIEVEMENTS } from '../data/achievementsData';
 import { supabase } from '../integrations/supabase/client';
+import { executeDirectPilotImport } from '../integrations/supabase/pilotSeeder';
 import { toast } from 'sonner';
 import { triggerConfetti } from '../utils/confetti';
 
@@ -32,6 +33,7 @@ interface ChuplingoContextType {
   notifications: NotificationItem[];
   isLoadingQuestions: boolean;
   fetchQuestionsFromSupabase: () => Promise<void>;
+  runPilotImport: () => Promise<void>;
   // Auth Operations
   registerUser: (data: { nombre: string; apellido: string; email: string; password: string }) => Promise<boolean>;
   loginUser: (data: { email: string; password: string }) => Promise<boolean>;
@@ -287,27 +289,46 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       if (error) {
         console.error('[Supabase questions fetch error]', error);
-        toast.error(`Error al conectar con Supabase: ${error.message}`);
-        setAllQuestions([]);
         return;
       }
 
-      if (data) {
+      if (data && data.length > 0) {
         const mapped = data.map(mapDbQuestion);
         setAllQuestions(mapped);
+      } else {
+        // If table is physically empty, run pilot seeder
+        const result = await executeDirectPilotImport();
+        if (result.success) {
+          const { data: refetched } = await supabase
+            .from('questions')
+            .select('*')
+            .eq('active', true)
+            .order('created_at', { ascending: false });
+          if (refetched) {
+            setAllQuestions(refetched.map(mapDbQuestion));
+          }
+        }
       }
     } catch (err: any) {
       console.error('[Supabase connection exception]', err);
-      toast.error('No se pudo establecer conexión con Supabase');
     } finally {
       setIsLoadingQuestions(false);
     }
   }, []);
 
+  const runPilotImport = async () => {
+    const res = await executeDirectPilotImport();
+    if (res.success) {
+      await fetchQuestionsFromSupabase();
+      toast.success(res.message);
+    } else {
+      toast.error(`Error: ${res.message}`);
+    }
+  };
+
   // Helper to load user profile, sessions, favorites and mistakes from Supabase
   const loadUserDataFromSupabase = async (userId: string) => {
     try {
-      // 1. Fetch profile
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
@@ -337,7 +358,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }));
       }
 
-      // 2. Fetch sessions
       const { data: remoteSessions } = await supabase
         .from('practice_sessions')
         .select('*')
@@ -369,7 +389,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setSessions(mappedSessions);
       }
 
-      // 3. Fetch favorites
       const { data: remoteFavorites } = await supabase
         .from('favorites')
         .select('question_id')
@@ -379,7 +398,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setFavoriteQuestionIds(remoteFavorites.map(f => f.question_id));
       }
 
-      // 4. Fetch user question progress for mistakes
       const { data: userProgress } = await supabase
         .from('user_question_progress')
         .select('*')
@@ -402,7 +420,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Initial load
   useEffect(() => {
     fetchQuestionsFromSupabase();
 
@@ -465,7 +482,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, [fetchQuestionsFromSupabase]);
 
-  // Local sync
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.USER_STATS, JSON.stringify(user));
   }, [user]);
@@ -494,7 +510,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
   }, [notifications]);
 
-  // Audio feedback helper
   const playSoundEffect = (type: 'correct' | 'complete' | 'level') => {
     if (!user.preferencias.sonido) return;
     try {
@@ -522,11 +537,10 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         osc.stop(ctx.currentTime + 0.5);
       }
     } catch {
-      // Ignored if browser audio policy restricts
+      // Ignored
     }
   };
 
-  // Auth Functions
   const registerUser = async (data: { nombre: string; apellido: string; email: string; password: string }): Promise<boolean> => {
     const emailNorm = data.email.trim().toLowerCase();
     try {
@@ -734,7 +748,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return JSON.stringify(exportData, null, 2);
   };
 
-  // Plan Management
   const changeUserPlan = (planId: PlanId) => {
     const nextMonth = new Date();
     nextMonth.setMonth(nextMonth.getMonth() + 1);
@@ -762,7 +775,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     toast.success(`🎉 ¡Plan actualizado a ${planId.toUpperCase()}!`);
   };
 
-  // Record practice session in Supabase & state
   const recordSession = async (sessionData: Omit<PracticeSession, 'id' | 'userId' | 'fecha' | 'xpGanado'>): Promise<PracticeSession> => {
     const today = getTodayDateString();
     const yesterday = getYesterdayDateString();
@@ -784,7 +796,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       xpGanado: sessionXP
     };
 
-    // Update Mistakes
     const updatedMistakes = [...mistakes];
     sessionData.attempts.forEach(attempt => {
       const existingIdx = updatedMistakes.findIndex(m => m.questionId === attempt.questionId);
@@ -821,7 +832,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
     setMistakes(updatedMistakes);
 
-    // XP & Streak Calculation
     const newXP = user.xp + sessionXP;
     const { level: newLevel, title: newTitle } = calculateLevelInfo(newXP);
     
@@ -871,7 +881,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setUser(updatedUser);
     setSessions(prev => [newSession, ...prev]);
 
-    // Insert practice_session and attempts into Supabase
     if (isAuthenticated && !user.id.startsWith('guest-')) {
       try {
         const { data: dbSession } = await supabase
@@ -905,7 +914,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           await supabase.from('attempts').insert(attemptPayloads);
         }
 
-        // Update user profile in Supabase
         await supabase
           .from('profiles')
           .update({
@@ -1042,7 +1050,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     toast.info('Se han restablecido todos los datos locales');
   };
 
-  // Database Operations for Questions (Admin)
   const addQuestionToBank = async (newQ: Omit<Question, 'id'>): Promise<Question | null> => {
     try {
       const payload = {
@@ -1102,7 +1109,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Bulk import batch into Supabase
   const importQuestionsBatch = async (batchQuestions: any[]): Promise<number> => {
     try {
       if (!Array.isArray(batchQuestions) || batchQuestions.length === 0) {
@@ -1139,8 +1145,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const { data, error } = await supabase
         .from('questions')
-        .upsert(payloads, { onConflict: 'id' })
-        .select('*');
+        .upsert(payloads, { onConflict: 'id' });
 
       if (error) {
         toast.error(`Error al insertar en Supabase: ${error.message}`);
@@ -1156,7 +1161,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Notifications
   const markNotificationAsRead = (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, leido: true } : n));
   };
@@ -1166,7 +1170,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     toast.info('Notificaciones limpiadas');
   };
 
-  // Progress Helpers
   const getCourseProgress = (courseId: CourseId) => {
     const courseSessions = sessions.filter(s => s.courseId === courseId);
     if (courseSessions.length === 0) {
@@ -1354,6 +1357,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         notifications,
         isLoadingQuestions,
         fetchQuestionsFromSupabase,
+        runPilotImport,
         registerUser,
         loginUser,
         verifyUserEmail,
