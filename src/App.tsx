@@ -6,7 +6,7 @@ import { ChuplingoProvider } from "./context/ChuplingoContext";
 import { MobileContainer } from "./components/layout/MobileContainer";
 import { BottomNav } from "./components/layout/BottomNav";
 
-// Pages
+// Core Pages
 import Home from "./pages/Home";
 import Welcome from "./pages/Welcome";
 import CoursesList from "./pages/CoursesList";
@@ -21,6 +21,16 @@ import MistakesScreen from "./pages/MistakesScreen";
 import FavoritesScreen from "./pages/FavoritesScreen";
 import AchievementsScreen from "./pages/AchievementsScreen";
 import ProfileScreen from "./pages/ProfileScreen";
+import PlansScreen from "./pages/PlansScreen";
+import NotificationsCenter from "./pages/NotificationsCenter";
+import EmailTemplatesPreview from "./pages/EmailTemplatesPreview";
+import AdminScreen from "./pages/AdminScreen";
+
+// Auth Pages
+import Register from "./pages/auth/Register";
+import Login from "./pages/auth/Login";
+import VerifyEmail from "./pages/auth/VerifyEmail";
+import ForgotPassword from "./pages/auth/ForgotPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,8 +38,17 @@ const queryClient = new QueryClient();
 const AppContent = () => {
   const location = useLocation();
 
-  // Hide bottom nav on specific fullscreen flows like splash or during active question screen
-  const hideBottomNavRoutes = ['/welcome', '/practice'];
+  // Hide bottom nav on onboarding, authentication, active question screen and admin views
+  const hideBottomNavRoutes = [
+    '/welcome',
+    '/register',
+    '/login',
+    '/verify-email',
+    '/forgot-password',
+    '/practice',
+    '/admin'
+  ];
+  
   const shouldHideBottomNav = hideBottomNavRoutes.some(path => location.pathname.startsWith(path));
 
   return (
@@ -37,6 +56,10 @@ const AppContent = () => {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/welcome" element={<Welcome />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/courses" element={<CoursesList />} />
         <Route path="/courses/:courseId" element={<CourseDetail />} />
         <Route path="/practice-setup" element={<PracticeSetup />} />
@@ -50,6 +73,10 @@ const AppContent = () => {
         <Route path="/mistakes" element={<MistakesScreen />} />
         <Route path="/favorites" element={<FavoritesScreen />} />
         <Route path="/achievements" element={<AchievementsScreen />} />
+        <Route path="/plans" element={<PlansScreen />} />
+        <Route path="/notifications" element={<NotificationsCenter />} />
+        <Route path="/email-templates" element={<EmailTemplatesPreview />} />
+        <Route path="/admin" element={<AdminScreen />} />
         <Route path="/profile" element={<ProfileScreen />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

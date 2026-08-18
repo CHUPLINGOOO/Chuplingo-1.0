@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { COURSES, INITIAL_QUESTIONS } from '../data/coursesData';
+import { COURSES } from '../data/coursesData';
 import { AppHeader } from '../components/layout/AppHeader';
 import { useChuplingo } from '../context/ChuplingoContext';
-import { PracticeMode, CourseId } from '../types/chuplingo';
-import { Zap, Target, Flame, AlertCircle, Star, Sparkles, Check, ArrowRight } from 'lucide-react';
+import { PracticeMode, CourseId, QuestionDifficulty } from '../types/chuplingo';
+import { Zap, Target, Flame, AlertCircle, Star, Sparkles, Check, ArrowRight, Timer } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PracticeSetup: React.FC = () => {
   const { courseId: paramCourseId, topicId: paramTopicId } = useParams<{ courseId?: string; topicId?: string }>();
   const navigate = useNavigate();
-  const { mistakes, favoriteQuestionIds } = useChuplingo();
+  const { mistakes, favoriteQuestionIds, user } = useChuplingo();
 
   const [selectedCourseId, setSelectedCourseId] = useState<CourseId>(
     (paramCourseId as CourseId) || 'literatura'
@@ -30,7 +30,7 @@ const PracticeSetup: React.FC = () => {
       id: 'rapida' as PracticeMode,
       title: 'Práctica rápida',
       count: 10,
-      description: '10 preguntas ideales para un repaso ágil.',
+      description: '10 preguntas para un repaso ágil y mantener la racha.',
       icon: Zap,
       badge: '10 preguntas',
       color: '#12B7E8'
@@ -39,7 +39,7 @@ const PracticeSetup: React.FC = () => {
       id: 'estandar' as PracticeMode,
       title: 'Práctica estándar',
       count: 20,
-      description: '20 preguntas equilibradas con dificultad mixta.',
+      description: '20 preguntas con dificultad progresiva.',
       icon: Target,
       badge: '20 preguntas',
       color: '#FF9418'
@@ -48,10 +48,19 @@ const PracticeSetup: React.FC = () => {
       id: 'intensiva' as PracticeMode,
       count: 30,
       title: 'Práctica intensiva',
-      description: '30 preguntas para máxima retención y examen.',
+      description: '30 preguntas para afianzar retención máxima.',
       icon: Flame,
       badge: '30 preguntas',
       color: '#F05C54'
+    },
+    {
+      id: 'simulacro' as PracticeMode,
+      count: 25,
+      title: 'Simulacro Tipo Admisión',
+      description: 'Preguntas aleatorias de los 8 cursos con temporizador.',
+      icon: Timer,
+      badge: 'Simulacro VIP',
+      color: '#7354D9'
     },
     {
       id: 'errores' as PracticeMode,
@@ -76,7 +85,6 @@ const PracticeSetup: React.FC = () => {
   ];
 
   const handleStart = () => {
-    // Navigate to practice session with query parameters
     const query = new URLSearchParams({
       course: selectedCourseId,
       topic: selectedTopicId,
@@ -98,40 +106,42 @@ const PracticeSetup: React.FC = () => {
       />
 
       <div className="px-4 flex flex-col gap-4">
-        {/* Course selector */}
-        <div>
-          <label className="text-xs font-black text-[#183153] uppercase tracking-wide block mb-2">
-            Curso
-          </label>
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-            {COURSES.map((course) => {
-              const isSelected = course.id === selectedCourseId;
-              return (
-                <button
-                  key={course.id}
-                  onClick={() => {
-                    setSelectedCourseId(course.id);
-                    setSelectedTopicId('all');
-                  }}
-                  className={`px-3 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border ${
-                    isSelected
-                      ? 'bg-[#183153] text-white border-[#183153] shadow-sm'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <span 
-                    className="w-2 h-2 rounded-full" 
-                    style={{ backgroundColor: course.colorHex }}
-                  />
-                  {course.nombre}
-                </button>
-              );
-            })}
+        {/* Course selector (hidden during multi-course simulacro) */}
+        {selectedMode !== 'simulacro' && selectedMode !== 'errores' && selectedMode !== 'favoritos' && (
+          <div>
+            <label className="text-xs font-black text-[#183153] uppercase tracking-wide block mb-2">
+              Curso
+            </label>
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+              {COURSES.map((course) => {
+                const isSelected = course.id === selectedCourseId;
+                return (
+                  <button
+                    key={course.id}
+                    onClick={() => {
+                      setSelectedCourseId(course.id);
+                      setSelectedTopicId('all');
+                    }}
+                    className={`px-3 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border ${
+                      isSelected
+                        ? 'bg-[#183153] text-white border-[#183153] shadow-sm'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span 
+                      className="w-2 h-2 rounded-full" 
+                      style={{ backgroundColor: course.colorHex }}
+                    />
+                    {course.nombre}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Topic selector */}
-        {selectedMode !== 'errores' && selectedMode !== 'favoritos' && (
+        {selectedMode !== 'simulacro' && selectedMode !== 'errores' && selectedMode !== 'favoritos' && (
           <div>
             <label className="text-xs font-black text-[#183153] uppercase tracking-wide block mb-2">
               Tema
@@ -148,6 +158,33 @@ const PracticeSetup: React.FC = () => {
                 </option>
               ))}
             </select>
+          </div>
+        )}
+
+        {/* Difficulty Filter */}
+        {selectedMode !== 'errores' && (
+          <div>
+            <label className="text-xs font-black text-[#183153] uppercase tracking-wide block mb-2">
+              Nivel de Dificultad
+            </label>
+            <div className="grid grid-cols-4 gap-1.5 bg-slate-200/80 p-1 rounded-2xl text-xs font-bold">
+              {[
+                { id: 'todas', label: 'Todas' },
+                { id: 'basico', label: 'Básico' },
+                { id: 'intermedio', label: 'Medio' },
+                { id: 'avanzado', label: 'Avanzado' }
+              ].map(d => (
+                <button
+                  key={d.id}
+                  onClick={() => setSelectedDifficulty(d.id)}
+                  className={`py-1.5 rounded-xl transition-all text-center ${
+                    selectedDifficulty === d.id ? 'bg-white text-[#183153] shadow-xs' : 'text-slate-600'
+                  }`}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -231,7 +268,7 @@ const PracticeSetup: React.FC = () => {
         </div>
 
         {/* Start Button */}
-        <div className="pt-3">
+        <div className="pt-3 pb-4">
           <button
             onClick={handleStart}
             className="w-full py-4 px-6 rounded-2xl text-white font-black text-sm shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95"

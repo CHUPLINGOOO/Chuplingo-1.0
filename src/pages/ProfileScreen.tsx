@@ -10,21 +10,48 @@ import {
   Target, 
   Volume2, 
   Bell, 
-  Smartphone, 
+  Shield, 
   RotateCcw, 
   ChevronRight,
   Edit2,
-  Check
+  Check,
+  CreditCard,
+  Download,
+  LogOut,
+  Mail,
+  Lock,
+  UserCheck
 } from 'lucide-react';
 import { LEVEL_THRESHOLDS } from '../data/coursesData';
+import { toast } from 'sonner';
 
 const ProfileScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { user, getOverallStats, achievements, updateUserName, updateUserPreferences, resetAllProgress } = useChuplingo();
+  const { 
+    user, 
+    getOverallStats, 
+    achievements, 
+    updateUserName, 
+    updateUserEmail,
+    updateUserPassword,
+    updateUserPreferences, 
+    resetAllProgress,
+    logoutUser,
+    deleteUserAccount,
+    exportUserDataJSON
+  } = useChuplingo();
+  
   const { totalSessions, totalQuestions, overallAccuracy } = getOverallStats();
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(user.nombre);
+  const [tempLastName, setTempLastName] = useState(user.apellido);
+
+  // Security modals state
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [newEmailInput, setNewEmailInput] = useState('');
+  const [oldPasswordInput, setOldPasswordInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
 
   const currentLevelThreshold = LEVEL_THRESHOLDS.find(l => l.nivel === user.nivel) || LEVEL_THRESHOLDS[0];
   const nextLevelThreshold = LEVEL_THRESHOLDS.find(l => l.nivel === user.nivel + 1) || { xpMinimo: user.xp + 500 };
@@ -34,8 +61,42 @@ const ProfileScreen: React.FC = () => {
   const levelProgressPercent = Math.min(100, Math.round((currentLevelXP / neededLevelXP) * 100));
 
   const handleSaveName = () => {
-    updateUserName(tempName);
+    updateUserName(tempName, tempLastName);
     setIsEditingName(false);
+  };
+
+  const handleExportData = () => {
+    const dataStr = exportUserDataJSON();
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chuplingo-datos-${user.nombre.toLowerCase()}.json`;
+    a.click();
+    toast.success('Tus datos de práctica se han descargado correctamente');
+  };
+
+  const handleChangeEmail = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEmailInput.includes('@')) {
+      toast.error('Ingresa un correo válido');
+      return;
+    }
+    updateUserEmail(newEmailInput);
+    setNewEmailInput('');
+  };
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPasswordInput.length < 8) {
+      toast.error('La nueva contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+    const ok = updateUserPassword(oldPasswordInput, newPasswordInput);
+    if (ok) {
+      setOldPasswordInput('');
+      setNewPasswordInput('');
+    }
   };
 
   return (
@@ -46,22 +107,38 @@ const ProfileScreen: React.FC = () => {
         subtitle="Progreso y configuración de cuenta"
         iconEmoji="👤"
         bgGradient="from-[#7354D9] to-[#9176EA]"
+        rightAction={
+          user.rol === 'admin' ? (
+            <button
+              onClick={() => navigate('/admin')}
+              className="bg-white/20 hover:bg-white/30 backdrop-blur-md px-3 py-1 rounded-full text-xs font-black text-white flex items-center gap-1"
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>Admin</span>
+            </button>
+          ) : undefined
+        }
       />
 
-      {/* Profile Avatar & Level Card */}
+      {/* Profile Card */}
       <div className="mx-4 -mt-6 bg-white rounded-3xl p-5 shadow-sm border border-slate-100 relative z-20 flex flex-col items-center text-center">
         <ChuplingoMascot mood="happy" size="md" />
 
-        {/* Editable Name */}
+        {/* Name and Email */}
         <div className="mt-2 flex items-center justify-center gap-2">
           {isEditingName ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <input
                 type="text"
                 value={tempName}
                 onChange={(e) => setTempName(e.target.value)}
-                className="text-base font-black text-[#183153] border-b-2 border-[#7354D9] text-center focus:outline-none px-2 py-0.5"
-                maxLength={24}
+                className="text-sm font-black text-[#183153] border-b-2 border-[#7354D9] text-center px-1 py-0.5 w-24"
+              />
+              <input
+                type="text"
+                value={tempLastName}
+                onChange={(e) => setTempLastName(e.target.value)}
+                className="text-sm font-black text-[#183153] border-b-2 border-[#7354D9] text-center px-1 py-0.5 w-24"
               />
               <button
                 onClick={handleSaveName}
@@ -73,7 +150,7 @@ const ProfileScreen: React.FC = () => {
           ) : (
             <div className="flex items-center gap-1.5">
               <h2 className="text-lg font-black text-[#183153]">
-                {user.nombre}
+                {user.nombre} {user.apellido}
               </h2>
               <button
                 onClick={() => setIsEditingName(true)}
@@ -86,9 +163,16 @@ const ProfileScreen: React.FC = () => {
           )}
         </div>
 
-        <span className="text-xs font-bold text-[#7354D9] mt-0.5">
-          Nivel {user.nivel} • {user.tituloNivel}
-        </span>
+        <p className="text-xs text-slate-400 font-medium">{user.email}</p>
+
+        <div className="flex items-center gap-2 mt-1">
+          <span className="text-xs font-bold text-[#7354D9]">
+            Nivel {user.nivel} • {user.tituloNivel}
+          </span>
+          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+            Plan {user.suscripcion.planId}
+          </span>
+        </div>
 
         {/* Level XP Bar */}
         <div className="w-full mt-4">
@@ -105,7 +189,7 @@ const ProfileScreen: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick stat chips */}
+        {/* Stats Chips */}
         <div className="grid grid-cols-3 gap-2 w-full mt-4 pt-3 border-t border-slate-100">
           <div className="p-2 rounded-xl bg-orange-50">
             <Flame className="w-4 h-4 text-[#FF5722] mx-auto mb-0.5" />
@@ -127,7 +211,27 @@ const ProfileScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Logros link card */}
+      {/* Subscription Plan CTA Card */}
+      <div className="px-4">
+        <div 
+          onClick={() => navigate('/plans')}
+          className="bg-gradient-to-r from-[#F05C54] to-[#FF9418] text-white rounded-2xl p-4 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md transition-all"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-black tracking-wider text-amber-200 block">Suscripción</span>
+              <h4 className="text-sm font-black">Plan {user.suscripcion.planId.toUpperCase()}</h4>
+              <p className="text-[11px] text-white/90">Ver planes y beneficios VIP</p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-white/80" />
+        </div>
+      </div>
+
+      {/* Logros link */}
       <div className="px-4">
         <div 
           onClick={() => navigate('/achievements')}
@@ -150,10 +254,10 @@ const ProfileScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Config / Settings Section */}
+      {/* Settings Options */}
       <div className="px-4 flex flex-col gap-3">
         <h3 className="text-xs font-black text-[#183153] uppercase tracking-wide">
-          Configuración de Estudio
+          Configuración y Seguridad
         </h3>
 
         {/* Daily Goal Option */}
@@ -188,7 +292,7 @@ const ProfileScreen: React.FC = () => {
             </div>
             <div>
               <span className="text-xs font-bold text-[#183153] block">Efectos de sonido</span>
-              <span className="text-[11px] text-slate-400">Audio al acertar y subir de nivel</span>
+              <span className="text-[11px] text-slate-400">Audio al responder y subir de nivel</span>
             </div>
           </div>
 
@@ -206,18 +310,112 @@ const ProfileScreen: React.FC = () => {
           </button>
         </div>
 
-        {/* Reset progress dangerous button */}
-        <div className="pt-2">
+        {/* Email templates previewer link */}
+        <button
+          onClick={() => navigate('/email-templates')}
+          className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-slate-50 text-[#183153] font-bold text-xs border border-slate-200 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <Mail className="w-4 h-4 text-[#12B7E8]" />
+            <span>Previsualizar correos transaccionales</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-slate-400" />
+        </button>
+
+        {/* Export Data */}
+        <button
+          onClick={handleExportData}
+          className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-slate-50 text-[#183153] font-bold text-xs border border-slate-200 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <Download className="w-4 h-4 text-[#7354D9]" />
+            <span>Descargar mis datos (JSON)</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-slate-400" />
+        </button>
+
+        {/* Security Settings Accordion */}
+        <button
+          onClick={() => setShowSecurityModal(!showSecurityModal)}
+          className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-slate-50 text-[#183153] font-bold text-xs border border-slate-200 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-[#F05C54]" />
+            <span>Seguridad: Cambiar correo o clave</span>
+          </div>
+          <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${showSecurityModal ? 'rotate-90' : ''}`} />
+        </button>
+
+        {showSecurityModal && (
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 flex flex-col gap-4 animate-in fade-in">
+            {/* Change Email */}
+            <form onSubmit={handleChangeEmail} className="flex flex-col gap-2">
+              <label className="text-[11px] font-black text-[#183153]">Cambiar correo electrónico</label>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  required
+                  placeholder="nuevo@correo.com"
+                  value={newEmailInput}
+                  onChange={(e) => setNewEmailInput(e.target.value)}
+                  className="flex-1 bg-slate-50 border rounded-xl px-3 py-2 text-xs font-bold"
+                />
+                <button type="submit" className="px-3 py-2 bg-[#183153] text-white rounded-xl text-xs font-black">
+                  Actualizar
+                </button>
+              </div>
+            </form>
+
+            {/* Change Password */}
+            <form onSubmit={handleChangePassword} className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+              <label className="text-[11px] font-black text-[#183153]">Cambiar contraseña</label>
+              <input
+                type="password"
+                required
+                placeholder="Contraseña actual"
+                value={oldPasswordInput}
+                onChange={(e) => setOldPasswordInput(e.target.value)}
+                className="bg-slate-50 border rounded-xl px-3 py-2 text-xs font-bold"
+              />
+              <input
+                type="password"
+                required
+                placeholder="Nueva contraseña (mínimo 8)"
+                value={newPasswordInput}
+                onChange={(e) => setNewPasswordInput(e.target.value)}
+                className="bg-slate-50 border rounded-xl px-3 py-2 text-xs font-bold"
+              />
+              <button type="submit" className="py-2.5 bg-[#F05C54] text-white rounded-xl text-xs font-black mt-1">
+                Guardar nueva contraseña
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Logout & Delete Account */}
+        <div className="pt-2 flex flex-col gap-2">
           <button
             onClick={() => {
-              if (window.confirm('¿Deseas reiniciar todas tus estadísticas y progreso en Chuplingo?')) {
-                resetAllProgress();
+              logoutUser();
+              navigate('/login');
+            }}
+            className="w-full py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-[#183153] font-black text-xs flex items-center justify-center gap-2 transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Cerrar sesión</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (window.confirm('¿Estás seguro de que deseas eliminar tu cuenta permanentemente? Se borrarán todos tus datos.')) {
+                deleteUserAccount();
+                navigate('/welcome');
               }
             }}
             className="w-full py-3 px-4 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs flex items-center justify-center gap-2 border border-rose-200 transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Restablecer datos de práctica</span>
+            <span>Eliminar cuenta</span>
           </button>
         </div>
       </div>
