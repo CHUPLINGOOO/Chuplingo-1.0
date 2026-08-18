@@ -5,174 +5,6 @@ export type CourseId =
   | 'razonamiento-verbal' 
   | 'civica' 
   | 'filosofia' 
-  | 'ingles'
-  | 'biologia';
-
-export type PracticeMode = 'rapida' | 'estandar' | 'intensiva' | 'errores' | 'favoritos' | 'simulacro' | 'tema';
-
-export type QuestionDifficulty = 'basico' | 'intermedio' | 'avanzado';
-
-export type PlanId = 'gratis' | 'fan' | 'lover' | 'vip';
-
-export interface Alternative {
-  id: 'A' | 'B' | 'C' | 'D' | 'E';
-  text: string;
-}
-
-export interface Question {
-  id: string;
-  courseId: CourseId;
-  topicId: string;
-  topicName: string;
-  subtopic?: string;
-  pregunta: string;
-  alternativas: Alternative[];
-  respuestaCorrecta: 'A' | 'B' | 'C' | 'D' | 'E';
-  explicacion: string;
-  fuente?: string;
-  universidad?: string;
-  anio?: number;
-  dificultad: QuestionDifficulty;
-  tags?: string[];
-}
-
-export interface Topic {
-  id: string;
-  courseId: CourseId;
-  numero: number;
-  nombre: string;
-  descripcion: string;
-  totalPreguntas: number;
-}
-
-export interface Course {
-  id: CourseId;
-  nombre: string;
-  descripcion: string;
-  icono: string;
-  colorHex: string;
-  bgGradient: string;
-  accentColor: string;
-  temas: Topic[];
-}
-
-export interface QuestionAttempt {
-  questionId: string;
-  courseId: CourseId;
-  topicId: string;
-  respuestaSeleccionada: 'A' | 'B' | 'C' | 'D' | 'E';
-  esCorrecta: boolean;
-  tiempoSegundos: number;
-  fecha: string;
-}
-
-export interface PracticeSession {
-  id: string;
-  userId: string;
-  courseId?: CourseId;
-  courseName: string;
-  topicId?: string;
-  topicName?: string;
-  mode: PracticeMode;
-  fecha: string;
-  duracionSegundos: number;
-  totalPreguntas: number;
-  correctas: number;
-  incorrectas: number;
-  porcentaje: number;
-  xpGanado: number;
-  isSimulacro?: boolean;
-  attempts: QuestionAttempt[];
-}
-
-export interface MistakeRecord {
-  questionId: string;
-  courseId: CourseId;
-  topicId: string;
-  fallosConsecutivos: number;
-  vecesAcertadaDespues: number;
-  dominada: boolean;
-  ultimoIntento: string;
-}
-
-export type ChallengeType = 'tests_completed' | 'questions_answered' | 'accuracy_target' | 'courses_practiced' | 'streak_days';
-
-export interface Challenge {
-  id: string;
-  titulo: string;
-  descripcion: string;
-  icono: string;
-  tipo: ChallengeType;
-  meta: number;
-  recompensaXP: number;
-  periodo: 'diario' | 'semanal';
-  reclamado?: boolean;
-}
-
-export interface Achievement {
-  id: string;
-  nombre: string;
-  descripcion: string;
-  icono: string;
-  categoria: 'racha' | 'preguntas' | 'precision' | 'cursos' | 'especial';
-  requisitoValor: number;
-  desbloqueadoEn?: string;
-}
-
-export interface UserPreferences {
-  metaDiaria: number; // 10, 20, 30, 50
-  horarioEstudio: string; // "19:00"
-  cursosFavoritos: CourseId[];
-  sonido: boolean;
-  vibracion: boolean;
-  recordatorios: boolean;
-  temaOscuro: boolean;
-  notificaciones: {
-    metaDiaria: boolean;
-    rachaEnRiesgo: boolean;
-    desafios: boolean;
-    logros: boolean;
-    resumenSemanal: boolean;
-    promocionales: boolean;
-  };
-}
-
-export interface SubscriptionInfo {
-  planId: PlanId;
-  estado: 'activa' | 'cancelada' | 'pendiente';
-  fechaInicio: string;
-  fechaRenovacion: string;
-  proveedor?: string;
-  transaccionId?: string;
-}
-
-export interface UserProfile {
-  id: string;
-  nombre: string;
-  apellido: string;
-  email: string;
-  emailVerificado: boolean;
-  avatar: string;
-  creadoEn: string;
-  suscripcion: SubscriptionInfo;
-  xp: number;
-  nivel: number;
-  tituloNivel: string;
-  rachaActual: number;
-  mejorRacha: number;
-  ultimaFechaRacha: string;
-  preguntasRespondidasHoy: number;
-  fechaPreguntasHoy: string;
-  metaDiariaCumplidaHoy: boolean;
-  preferencias: UserPreferences;
-  onboardingCompletado<dyad-write path="src/types/chuplingo.ts" description="Complete TypeScript definitions for Chuplingo 2.0">
-export type CourseId = 
-  | 'literatura' 
-  | 'psicologia' 
-  | 'geografia' 
-  | 'razonamiento-verbal' 
-  | 'civica' 
-  | 'filosofia' 
   | 'ingles' 
   | 'biologia';
 
@@ -190,17 +22,21 @@ export interface Alternative {
 export interface Question {
   id: string;
   courseId: CourseId;
-  topicId: string;
-  topicName: string;
-  subtopic?: string;
+  topicId?: string | null;
+  topicName?: string;
+  subtopic?: string | null;
   pregunta: string;
   alternativas: Alternative[];
   respuestaCorrecta: 'A' | 'B' | 'C' | 'D' | 'E';
   explicacion: string;
-  fuente?: string;
-  universidad?: string;
-  anio?: number;
+  fuente?: string | null;
+  sourceDocument?: string | null;
+  sourcePage?: string | null;
+  origin?: string | null;
+  officialExamQuestion?: boolean;
+  questionType?: string;
   dificultad: QuestionDifficulty;
+  active?: boolean;
   tags?: string[];
 }
 
@@ -226,8 +62,8 @@ export interface Course {
 
 export interface QuestionAttempt {
   questionId: string;
-  courseId: CourseId;
-  topicId: string;
+  courseId?: CourseId;
+  topicId?: string;
   respuestaSeleccionada: 'A' | 'B' | 'C' | 'D' | 'E';
   esCorrecta: boolean;
   tiempoSegundos: number;
@@ -255,8 +91,8 @@ export interface PracticeSession {
 
 export interface MistakeRecord {
   questionId: string;
-  courseId: CourseId;
-  topicId: string;
+  courseId?: CourseId;
+  topicId?: string;
   fallosConsecutivos: number;
   vecesAcertadaDespues: number;
   dominada: boolean;

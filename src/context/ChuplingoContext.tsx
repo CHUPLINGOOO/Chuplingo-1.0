@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { 
   UserProfile, 
   PracticeSession, 
@@ -30,6 +30,8 @@ interface ChuplingoContextType {
   achievements: Achievement[];
   claimedChallengeIds: string[];
   notifications: NotificationItem[];
+  isLoadingQuestions: boolean;
+  fetchQuestionsFromSupabase: () => Promise<void>;
   // Auth Operations
   registerUser: (data: { nombre: string; apellido: string; email: string; password: string }) => Promise<boolean>;
   loginUser: (data: { email: string; password: string }) => Promise<boolean>;
@@ -53,10 +55,9 @@ interface ChuplingoContextType {
   resetAllProgress: () => void;
   completeOnboarding: (prefs?: { metaDiaria?: number; horarioEstudio?: string; cursosFavoritos?: CourseId[] }) => void;
   // Admin Operations
-  addQuestionToBank: (newQ: Omit<Question, 'id'>) => Question;
-  updateQuestionInBank: (id: string, updatedQ: Partial<Question>) => boolean;
-  deleteQuestionFromBank: (id: string) => boolean;
-  importQuestionsJSON: (questions: Question[]) => number;
+  addQuestionToBank: (newQ: Omit<Question, 'id'>) => Promise<Question | null>;
+  deleteQuestionFromBank: (id: string) => Promise<boolean>;
+  importQuestionsBatch: (questions: any[]) => Promise<number>;
   // Notifications
   markNotificationAsRead: (id: string) => void;
   clearAllNotifications: () => void;
@@ -177,6 +178,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState<boolean>(false);
 
   const [sessions, setSessions] = useState<PracticeSession[]>(() => {
     try {
@@ -241,6 +243,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   });
 
+  const [supabaseQuestions, setSupabaseQuestions] = useState<Question[]>([]);
   const [customQuestions, setCustomQuestions] = useState<Question[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.CUSTOM_QUESTIONS);
@@ -250,12 +253,73 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   });
 
-  const allQuestions = [...INITIAL_QUESTIONS, ...customQuestions];
+  // Map database question row to Question interface
+  const mapDbQuestion = (dbQ: any): Question => {
+    const course = COURSES.find(c => c.id === dbQ.course_id);
+    const topic = course?.temas.find(t => t.id === dbQ.topic_id);
 
-  // Helper to load user data from Supabase
+    return {
+      id: dbQ.id,
+      courseId: dbQ.course_id as CourseId,
+      topicId: dbQ.topic_id || undefined,
+      topicName: topic?.nombre || dbQ.topic_id || 'Tema General',
+      subtopic: dbQ.subtopic || undefined,
+      pregunta: dbQ.question,
+      alternativas: [
+        { id: 'A', text: dbQ.option_a || '' },
+        { id: 'B', text: dbQ.option_b || '' },
+        { id: 'C', text: dbQ.option_c || '' },
+        { id: 'D', text: dbQ.option_d || '' },
+        { id: 'E', text: dbQ.option_e || '' },
+      ],
+      respuestaCorrecta: (dbQ.correct_answer?.toUpperCase() || 'A') as 'A' | 'B' | 'C' | 'D' | 'E',
+      explicacion: dbQ.explanation || '',
+      fuente: dbQ.origin || dbQ.source_document || 'Admisión Universitaria',
+      sourceDocument: dbQ.source_document || undefined,
+      sourcePage: dbQ.source_page || undefined,
+      origin: dbQ.origin || undefined,
+      officialExamQuestion: dbQ.official_exam_question || false,
+      questionType: dbQ.question_type || 'multiple_choice',
+      dificultad: (dbQ.difficulty?.toLowerCase() || 'intermedio') as any,
+      active: dbQ.active !== false
+    };
+  };
+
+  // Fetch questions from Supabase table `questions`
+  const fetchQuestionsFromSupabase = useCallback(async () => {
+    try {
+      setIsLoadingQuestions(true);
+      const { data, error } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('Could not fetch questions from Supabase, using local defaults', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const mapped = data.map(mapDbQuestion);
+        setSupabaseQuestions(mapped);
+      }
+    } catch (err) {
+      console.error('Error fetching questions from Supabase', err);
+    } finally {
+      setIsLoadingQuestions(false);
+    }
+  }, []);
+
+  // Questions precedence: Supabase questions if present > customQuestions > initial Questions
+  const allQuestions = supabaseQuestions.length > 0 
+    ? supabaseQuestions 
+    : [...customQuestions, ...INITIAL_QUESTIONS];
+
+  // Helper to load user profile, sessions, favorites and mistakes from Supabase
   const loadUserDataFromSupabase = async (userId: string) => {
     try {
-      // 1. Fetch profile from Supabase
+      // 1. Fetch profile
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
@@ -274,6 +338,10 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           tituloNivel: title,
           rachaActual: profile.current_streak || 0,
           mejorRacha: profile.best_streak || 0,
+          preferencias: {
+            ...prev.preferencias,
+            metaDiaria: profile.daily_goal || prev.preferencias.metaDiaria
+          },
           suscripcion: {
             ...prev.suscripcion,
             planId: (profile.plan?.toLowerCase() as PlanId) || 'gratis'
@@ -281,7 +349,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }));
       }
 
-      // 2. Fetch sessions from Supabase
+      // 2. Fetch sessions
       const { data: remoteSessions } = await supabase
         .from('practice_sessions')
         .select('*')
@@ -313,7 +381,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setSessions(mappedSessions);
       }
 
-      // 3. Fetch favorites from Supabase
+      // 3. Fetch favorites
       const { data: remoteFavorites } = await supabase
         .from('favorites')
         .select('question_id')
@@ -322,13 +390,34 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (remoteFavorites) {
         setFavoriteQuestionIds(remoteFavorites.map(f => f.question_id));
       }
+
+      // 4. Fetch user question progress for mistakes
+      const { data: userProgress } = await supabase
+        .from('user_question_progress')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (userProgress && userProgress.length > 0) {
+        const mappedMistakes: MistakeRecord[] = userProgress
+          .filter(p => p.incorrect_count > 0)
+          .map(p => ({
+            questionId: p.question_id,
+            fallosConsecutivos: p.incorrect_count,
+            vecesAcertadaDespues: p.correct_count,
+            dominada: !!p.mastered,
+            ultimoIntento: p.last_answered_at
+          }));
+        setMistakes(mappedMistakes);
+      }
     } catch (err) {
       console.error('Error fetching Supabase user data', err);
     }
   };
 
-  // Listen to Supabase auth state
+  // Initial load
   useEffect(() => {
+    fetchQuestionsFromSupabase();
+
     const checkInitialSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -386,9 +475,9 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchQuestionsFromSupabase]);
 
-  // Local persistence sync
+  // Local sync
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.USER_STATS, JSON.stringify(user));
   }, [user]);
@@ -449,11 +538,11 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         osc.stop(ctx.currentTime + 0.5);
       }
     } catch {
-      // Ignored if audio context is blocked
+      // Ignored if browser audio policy restricts
     }
   };
 
-  // Auth Functions with Supabase
+  // Auth Functions
   const registerUser = async (data: { nombre: string; apellido: string; email: string; password: string }): Promise<boolean> => {
     const emailNorm = data.email.trim().toLowerCase();
     try {
@@ -662,7 +751,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // Plan Management
-  const changeUserPlan = async (planId: PlanId) => {
+  const changeUserPlan = (planId: PlanId) => {
     const nextMonth = new Date();
     nextMonth.setMonth(nextMonth.getMonth() + 1);
 
@@ -678,14 +767,10 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }));
 
     if (isAuthenticated && !user.id.startsWith('guest-')) {
-      try {
-        await supabase
-          .from('profiles')
-          .update({ plan: planId.toUpperCase(), updated_at: new Date().toISOString() })
-          .eq('id', user.id);
-      } catch (err) {
-        console.error('Error updating plan in Supabase', err);
-      }
+      supabase.from('profiles').update({
+        plan: planId.toUpperCase(),
+        updated_at: new Date().toISOString()
+      }).eq('id', user.id);
     }
 
     playSoundEffect('complete');
@@ -693,47 +778,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     toast.success(`🎉 ¡Plan actualizado a ${planId.toUpperCase()}!`);
   };
 
-  // Check achievements against stats
-  const checkAchievements = (
-    currentXp: number, 
-    currentStreak: number, 
-    totalQuestionsAnswered: number, 
-    bestAccuracy: number,
-    practicedCourses: Set<CourseId>,
-    dominatedMistakes: number
-  ) => {
-    let changed = false;
-    const updated = achievements.map(ach => {
-      if (ach.desbloqueadoEn) return ach;
-      let unlocked = false;
-
-      if (ach.id === 'ach-1' && currentStreak >= 3) unlocked = true;
-      if (ach.id === 'ach-2' && totalQuestionsAnswered >= 100) unlocked = true;
-      if (ach.id === 'ach-3' && bestAccuracy >= 90) unlocked = true;
-      if (ach.id === 'ach-4' && currentStreak >= 30) unlocked = true;
-      if (ach.id === 'ach-5' && practicedCourses.size >= 8) unlocked = true;
-      if (ach.id === 'ach-6' && practicedCourses.has('ingles')) unlocked = true;
-      if (ach.id === 'ach-7' && dominatedMistakes >= 5) unlocked = true;
-      if (ach.id === 'ach-8' && favoriteQuestionIds.length >= 10) unlocked = true;
-
-      if (unlocked) {
-        changed = true;
-        toast.success(`🏆 ¡Logro desbloqueado: ${ach.nombre}!`, {
-          description: ach.descripcion,
-          duration: 4500
-        });
-        triggerConfetti();
-        return { ...ach, desbloqueadoEn: new Date().toISOString() };
-      }
-      return ach;
-    });
-
-    if (changed) {
-      setAchievements(updated);
-    }
-  };
-
-  // Record practice session
+  // Record practice session in Supabase & state
   const recordSession = (sessionData: Omit<PracticeSession, 'id' | 'userId' | 'fecha' | 'xpGanado'>): PracticeSession => {
     const today = getTodayDateString();
     const yesterday = getYesterdayDateString();
@@ -755,7 +800,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       xpGanado: sessionXP
     };
 
-    // Update Mistakes
+    // Update Mistakes & question progress
     const updatedMistakes = [...mistakes];
     sessionData.attempts.forEach(attempt => {
       const existingIdx = updatedMistakes.findIndex(m => m.questionId === attempt.questionId);
@@ -842,11 +887,10 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setUser(updatedUser);
     setSessions(prev => [newSession, ...prev]);
 
-    // Asynchronously sync session to Supabase if authenticated
+    // Asynchronously insert session and attempts in Supabase
     if (isAuthenticated && !user.id.startsWith('guest-')) {
       (async () => {
         try {
-          // 1. Insert practice_session
           const { data: dbSession } = await supabase
             .from('practice_sessions')
             .insert({
@@ -865,7 +909,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             .select('id')
             .single();
 
-          // 2. Insert attempts if session was inserted
           if (dbSession?.id && sessionData.attempts.length > 0) {
             const attemptPayloads = sessionData.attempts.map(att => ({
               user_id: user.id,
@@ -879,7 +922,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             await supabase.from('attempts').insert(attemptPayloads);
           }
 
-          // 3. Update user profile stats in Supabase
+          // Update user profile in Supabase
           await supabase
             .from('profiles')
             .update({
@@ -895,14 +938,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       })();
     }
-
-    // Check achievements
-    const allSessionsList = [newSession, ...sessions];
-    const totalQ = allSessionsList.reduce((acc, s) => acc + s.totalPreguntas, 0);
-    const practicedCourses = new Set<CourseId>(allSessionsList.map(s => s.courseId).filter(Boolean) as CourseId[]);
-    const dominatedCount = updatedMistakes.filter(m => m.dominada).length;
-
-    checkAchievements(newXP, newStreak, totalQ, sessionData.porcentaje, practicedCourses, dominatedCount);
 
     return newSession;
   };
@@ -1025,46 +1060,119 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     toast.info('Se han restablecido todos los datos locales');
   };
 
-  // Admin Question Bank Operations
-  const addQuestionToBank = (newQ: Omit<Question, 'id'>): Question => {
-    const q: Question = {
-      ...newQ,
-      id: `custom-q-${Date.now()}`
-    };
-    setCustomQuestions(prev => [q, ...prev]);
-    toast.success('Pregunta añadida exitosamente al banco');
-    return q;
-  };
+  // Database Operations for Questions (Admin)
+  const addQuestionToBank = async (newQ: Omit<Question, 'id'>): Promise<Question | null> => {
+    try {
+      const payload = {
+        course_id: newQ.courseId,
+        topic_id: newQ.topicId || null,
+        subtopic: newQ.subtopic || null,
+        difficulty: newQ.dificultad || 'intermedio',
+        question_type: newQ.questionType || 'multiple_choice',
+        question: newQ.pregunta,
+        option_a: newQ.alternativas.find(a => a.id === 'A')?.text || '',
+        option_b: newQ.alternativas.find(a => a.id === 'B')?.text || '',
+        option_c: newQ.alternativas.find(a => a.id === 'C')?.text || '',
+        option_d: newQ.alternativas.find(a => a.id === 'D')?.text || '',
+        option_e: newQ.alternativas.find(a => a.id === 'E')?.text || '',
+        correct_answer: newQ.respuestaCorrecta,
+        explanation: newQ.explicacion || null,
+        source_document: newQ.sourceDocument || null,
+        source_page: newQ.sourcePage || null,
+        origin: newQ.origin || newQ.fuente || 'Banco Chuplingo',
+        official_exam_question: !!newQ.officialExamQuestion,
+        active: true
+      };
 
-  const updateQuestionInBank = (id: string, updatedQ: Partial<Question>): boolean => {
-    let found = false;
-    setCustomQuestions(prev => prev.map(q => {
-      if (q.id === id) {
-        found = true;
-        return { ...q, ...updatedQ };
+      const { data, error } = await supabase
+        .from('questions')
+        .insert(payload)
+        .select('*')
+        .single();
+
+      if (error) {
+        toast.error(`Error de Supabase: ${error.message}`);
+        // Fallback local
+        const fallbackQ: Question = { ...newQ, id: `custom-q-${Date.now()}` };
+        setCustomQuestions(prev => [fallbackQ, ...prev]);
+        return fallbackQ;
       }
-      return q;
-    }));
-    if (found) {
-      toast.success('Pregunta actualizada en el banco');
-      return true;
+
+      const mapped = mapDbQuestion(data);
+      setSupabaseQuestions(prev => [mapped, ...prev]);
+      toast.success('Pregunta guardada exitosamente en Supabase');
+      return mapped;
+    } catch (err: any) {
+      toast.error('Error al guardar pregunta en la base de datos');
+      return null;
     }
-    toast.info('Las preguntas base del sistema son de solo lectura');
-    return false;
   };
 
-  const deleteQuestionFromBank = (id: string): boolean => {
-    setCustomQuestions(prev => prev.filter(q => q.id !== id));
-    toast.success('Pregunta eliminada del banco');
-    return true;
+  const deleteQuestionFromBank = async (id: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase.from('questions').delete().eq('id', id);
+      if (!error) {
+        setSupabaseQuestions(prev => prev.filter(q => q.id !== id));
+      }
+      setCustomQuestions(prev => prev.filter(q => q.id !== id));
+      toast.success('Pregunta eliminada');
+      return true;
+    } catch {
+      return false;
+    }
   };
 
-  const importQuestionsJSON = (imported: Question[]): number => {
-    if (!Array.isArray(imported)) return 0;
-    const valid = imported.filter(q => q.courseId && q.pregunta && q.respuestaCorrecta && q.alternativas?.length === 5);
-    setCustomQuestions(prev => [...valid, ...prev]);
-    toast.success(`Se importaron ${valid.length} preguntas correctamente`);
-    return valid.length;
+  // Bulk import batch of 100 questions into Supabase
+  const importQuestionsBatch = async (batchQuestions: any[]): Promise<number> => {
+    try {
+      if (!Array.isArray(batchQuestions) || batchQuestions.length === 0) {
+        toast.error('El lote no contiene registros válidos');
+        return 0;
+      }
+
+      const payloads = batchQuestions.map(q => ({
+        course_id: q.course_id || q.courseId,
+        topic_id: q.topic_id || q.topicId || null,
+        subtopic: q.subtopic || null,
+        difficulty: (q.difficulty || q.dificultad || 'intermedio').toLowerCase(),
+        question_type: q.question_type || q.questionType || 'multiple_choice',
+        question: q.question || q.pregunta,
+        option_a: q.option_a || q.alternativas?.find((a: any) => a.id === 'A')?.text || '',
+        option_b: q.option_b || q.alternativas?.find((a: any) => a.id === 'B')?.text || '',
+        option_c: q.option_c || q.alternativas?.find((a: any) => a.id === 'C')?.text || '',
+        option_d: q.option_d || q.alternativas?.find((a: any) => a.id === 'D')?.text || '',
+        option_e: q.option_e || q.alternativas?.find((a: any) => a.id === 'E')?.text || '',
+        correct_answer: (q.correct_answer || q.respuestaCorrecta || 'A').toUpperCase(),
+        explanation: q.explanation || q.explicacion || '',
+        source_document: q.source_document || q.sourceDocument || null,
+        source_page: q.source_page || q.sourcePage || null,
+        origin: q.origin || q.fuente || 'Examen de Admisión',
+        official_exam_question: q.official_exam_question !== undefined ? !!q.official_exam_question : true,
+        active: true
+      })).filter(p => p.course_id && p.question && p.option_a && p.option_b && p.option_c && p.option_d && p.option_e && p.correct_answer);
+
+      if (payloads.length === 0) {
+        toast.error('No se encontraron preguntas con la estructura completa requerida');
+        return 0;
+      }
+
+      const { data, error } = await supabase
+        .from('questions')
+        .insert(payloads)
+        .select('*');
+
+      if (error) {
+        toast.error(`Error al insertar en Supabase: ${error.message}`);
+        return 0;
+      }
+
+      await fetchQuestionsFromSupabase();
+      toast.success(`🎉 ¡Se importaron exitosamente ${data?.length || payloads.length} preguntas en Supabase!`);
+      return data?.length || payloads.length;
+    } catch (err: any) {
+      toast.error('Ocurrió un error durante la importación en lote');
+      return 0;
+    }
   };
 
   // Notifications
@@ -1206,23 +1314,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     }
 
-    if (!candidate) {
-      for (const course of COURSES) {
-        for (const topic of course.temas) {
-          const prog = getTopicProgress(topic.id);
-          if (prog.attempts === 0) {
-            return {
-              courseId: course.id,
-              topicId: topic.id,
-              topicName: topic.nombre,
-              courseName: course.nombre,
-              accuracy: 0
-            };
-          }
-        }
-      }
-    }
-
     return candidate;
   };
 
@@ -1280,6 +1371,8 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         achievements,
         claimedChallengeIds,
         notifications,
+        isLoadingQuestions,
+        fetchQuestionsFromSupabase,
         registerUser,
         loginUser,
         verifyUserEmail,
@@ -1300,9 +1393,8 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         resetAllProgress,
         completeOnboarding,
         addQuestionToBank,
-        updateQuestionInBank,
         deleteQuestionFromBank,
-        importQuestionsJSON,
+        importQuestionsBatch,
         markNotificationAsRead,
         clearAllNotifications,
         getCourseProgress,

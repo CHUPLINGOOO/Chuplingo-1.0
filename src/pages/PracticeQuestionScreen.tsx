@@ -3,33 +3,42 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { COURSES } from '../data/coursesData';
 import { Question, QuestionAttempt, CourseId, PracticeMode } from '../types/chuplingo';
 import { useChuplingo } from '../context/ChuplingoContext';
-import { Star, ArrowRight, CheckCircle2, XCircle, Clock, Lightbulb, ArrowLeft, Timer } from 'lucide-react';
+import { Star, ArrowRight, CheckCircle2, XCircle, Clock, Lightbulb, ArrowLeft, Timer, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Fisher-Yates array shuffler to guarantee no repeats and true randomness
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
 
 const PracticeQuestionScreen: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { allQuestions, mistakes, favoriteQuestionIds, toggleFavorite, isFavorite, recordSession } = useChuplingo();
+  const { allQuestions, mistakes, favoriteQuestionIds, toggleFavorite, isFavorite, recordSession, isLoadingQuestions } = useChuplingo();
 
   const courseParam = (searchParams.get('course') as CourseId) || 'literatura';
   const topicParam = searchParams.get('topic') || 'all';
   const modeParam = (searchParams.get('mode') as PracticeMode) || 'rapida';
   const difficultyParam = searchParams.get('difficulty') || 'todas';
 
-  // Filter relevant questions for this session
+  // Filter relevant questions for this session with deduplication and randomized shuffle
   const sessionQuestions = useMemo(() => {
-    let list: Question[] = [];
+    let pool: Question[] = [];
 
     if (modeParam === 'simulacro') {
-      // Shuffled multi-course questions across all 8 courses
-      list = [...allQuestions].sort(() => Math.random() - 0.5);
+      pool = [...allQuestions];
     } else if (modeParam === 'errores') {
       const mistakenIds = mistakes.filter(m => !m.dominada).map(m => m.questionId);
-      list = allQuestions.filter(q => mistakenIds.includes(q.id));
+      pool = allQuestions.filter(q => mistakenIds.includes(q.id));
     } else if (modeParam === 'favoritos') {
-      list = allQuestions.filter(q => favoriteQuestionIds.includes(q.id));
+      pool = allQuestions.filter(q => favoriteQuestionIds.includes(q.id));
     } else {
-      list = allQuestions.filter(q => {
+      pool = allQuestions.filter(q => {
         const matchesCourse = q.courseId === courseParam;
         const matchesTopic = topicParam === 'all' || q.topicId === topicParam;
         const matchesDiff = difficultyParam === 'todas' || q.dificultad === difficultyParam;
@@ -37,15 +46,32 @@ const PracticeQuestionScreen: React.FC = () => {
       });
     }
 
-    if (list.length === 0) {
-      list = allQuestions.filter(q => q.courseId === courseParam);
+    if (pool.length === 0) {
+      pool = allQuestions.filter(q => q.courseId === courseParam);
     }
-    if (list.length === 0) {
-      list = allQuestions;
+    if (pool.length === 0) {
+      pool = allQuestions;
     }
 
-    const limit = modeParam === 'rapida' ? 10 : modeParam === 'estandar' ? 20 : modeParam === 'intensiva' ? 30 : modeParam === 'simulacro' ? 20 : list.length;
-    return list.slice(0, Math.min(limit, list.length));
+    // Deduplicate by question ID
+    const uniqueMap = new Map<string, Question>();
+    pool.forEach(q => {
+      if (!uniqueMap.has(q.id)) {
+        uniqueMap.set(q.id, q);
+      }
+    });
+
+    const uniqueQuestions = Array.from(uniqueMap.values());
+    const randomized = shuffleArray(uniqueQuestions);
+
+    const limit = 
+      modeParam === 'rapida' ? 10 : 
+      modeParam === 'estandar' ? 20 : 
+      modeParam === 'intensiva' ? 30 : 
+      modeParam === 'simulacro' ? 25 : 
+      randomized.length;
+
+    return randomized.slice(0, Math.min(limit, randomized.length));
   }, [allQuestions, courseParam, topicParam, modeParam, difficultyParam, mistakes, favoriteQuestionIds]);
 
   const activeCourse = COURSES.find(c => c.id === courseParam) || COURSES[0];
@@ -56,7 +82,7 @@ const PracticeQuestionScreen: React.FC = () => {
   const [attempts, setAttempts] = useState<QuestionAttempt[]>([]);
   const [startTime] = useState<number>(Date.now());
   const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
-  const [secondsRemaining, setSecondsRemaining] = useState<number>(modeParam === 'simulacro' ? 1200 : 0);
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(modeParam === 'simulacro' ? 1500 : 0);
 
   const currentQuestion = sessionQuestions[currentIndex];
   const isLastQuestion = currentIndex === sessionQuestions.length - 1;
@@ -83,13 +109,22 @@ const PracticeQuestionScreen: React.FC = () => {
     setIsAnswerLocked(false);
   }, [currentIndex]);
 
+  if (isLoadingQuestions) {
+    return (
+      <div className="min-h-screen bg-[#F7F8FC] flex flex-col items-center justify-center p-6 text-center">
+        <Sparkles className="w-10 h-10 text-[#F05C54] animate-spin mb-3" />
+        <p className="text-sm font-black text-[#183153]">Cargando preguntas de Chuplingo...</p>
+      </div>
+    );
+  }
+
   if (!currentQuestion) {
     return (
-      <div className="p-6 text-center">
+      <div className="min-h-screen bg-[#F7F8FC] flex flex-col items-center justify-center p-6 text-center">
         <p className="text-sm font-bold text-slate-600">No se encontraron preguntas para esta configuración.</p>
         <button
           onClick={() => navigate('/practice-setup')}
-          className="mt-4 px-4 py-2 bg-[#F05C54] text-white rounded-xl text-xs font-bold"
+          className="mt-4 px-5 py-2.5 bg-[#F05C54] text-white rounded-2xl text-xs font-black"
         >
           Volver a Selección
         </button>
@@ -109,7 +144,7 @@ const PracticeQuestionScreen: React.FC = () => {
     const attempt: QuestionAttempt = {
       questionId: currentQuestion.id,
       courseId: currentQuestion.courseId,
-      topicId: currentQuestion.topicId,
+      topicId: currentQuestion.topicId || undefined,
       respuestaSeleccionada: optId,
       esCorrecta: isCorrect,
       tiempoSegundos: timeSpent,
@@ -136,7 +171,7 @@ const PracticeQuestionScreen: React.FC = () => {
         courseId: modeParam === 'simulacro' ? undefined : activeCourse.id,
         courseName: modeParam === 'simulacro' ? 'Simulacro Tipo Admisión' : activeCourse.nombre,
         topicId: topicParam !== 'all' ? topicParam : undefined,
-        topicName: modeParam === 'simulacro' ? 'Multi-curso (8 Áreas)' : currentQuestion.topicName,
+        topicName: modeParam === 'simulacro' ? 'Multi-curso (8 Áreas)' : (currentQuestion.topicName || 'Práctica General'),
         mode: modeParam,
         duracionSegundos: totalDuration,
         totalPreguntas: total,
@@ -228,7 +263,7 @@ const PracticeQuestionScreen: React.FC = () => {
             className="text-[10px] font-black px-2.5 py-1 rounded-full text-white"
             style={{ backgroundColor: activeCourse.colorHex }}
           >
-            {currentQuestion.topicName}
+            {currentQuestion.topicName || activeCourse.nombre}
           </span>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 capitalize">
             Nivel {currentQuestion.dificultad}
@@ -247,7 +282,7 @@ const PracticeQuestionScreen: React.FC = () => {
           </h2>
         </div>
 
-        {/* Alternatives (A-E) */}
+        {/* 5 Alternatives (A, B, C, D, E) */}
         <div className="flex flex-col gap-2.5">
           {currentQuestion.alternativas.map((alt) => {
             const isSelected = selectedAnswer === alt.id;
@@ -289,7 +324,7 @@ const PracticeQuestionScreen: React.FC = () => {
           })}
         </div>
 
-        {/* Immediate Pedagogical Feedback */}
+        {/* Pedagogical Feedback */}
         {isAnswerLocked && (
           <div className={`p-4 rounded-2xl border animate-in fade-in slide-in-from-bottom-2 duration-200 ${
             selectedAnswer === currentQuestion.respuestaCorrecta
@@ -322,7 +357,7 @@ const PracticeQuestionScreen: React.FC = () => {
         )}
       </div>
 
-      {/* Bottom Floating Bar */}
+      {/* Bottom Action Bar */}
       <div className="p-4 bg-white/95 backdrop-blur-md border-t border-slate-100 sticky bottom-0 z-30">
         <div className="max-w-[430px] mx-auto">
           {isAnswerLocked ? (
