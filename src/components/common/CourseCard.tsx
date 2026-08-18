@@ -21,10 +21,11 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 
 export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
   const navigate = useNavigate();
-  const { getCourseProgress } = useChuplingo();
+  const { getCourseProgress, courseQuestionCounts } = useChuplingo();
   const { masteryPercent, completedTopicsCount } = getCourseProgress(course.id);
 
   const IconComponent = ICON_MAP[course.icono] || BookOpen;
+  const questionsInCourse = courseQuestionCounts[course.id] || 1000;
 
   return (
     <div 
@@ -52,9 +53,14 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
             </div>
 
             <div className="flex-1 min-w-0">
-              <h3 className="text-base font-black text-[#183153] leading-tight truncate">
-                {course.nombre}
-              </h3>
+              <div className="flex items-center justify-between gap-1">
+                <h3 className="text-base font-black text-[#183153] leading-tight truncate">
+                  {course.nombre}
+                </h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
+                  {questionsInCourse} preguntas
+                </span>
+              </div>
               <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
                 {course.descripcion}
               </p>

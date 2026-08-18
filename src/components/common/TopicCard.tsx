@@ -11,10 +11,11 @@ interface TopicCardProps {
 
 export const TopicCard: React.FC<TopicCardProps> = ({ topic, course }) => {
   const navigate = useNavigate();
-  const { getTopicProgress } = useChuplingo();
+  const { getTopicProgress, topicQuestionCounts } = useChuplingo();
   const { accuracy, status } = getTopicProgress(topic.id);
 
   const formatNumber = (num: number) => String(num).padStart(2, '0');
+  const questionsInTopic = topicQuestionCounts[topic.id] || 100;
 
   const statusLabel = 
     status === 'dominado' 
@@ -48,10 +49,13 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, course }) => {
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-0.5">
+        <div className="flex items-center justify-between gap-2 mb-0.5">
           <h4 className="text-sm font-black text-[#183153] leading-snug truncate">
             {topic.nombre}
           </h4>
+          <span className="text-[10px] text-slate-400 font-bold">
+            {questionsInTopic} preg.
+          </span>
         </div>
         
         <p className="text-xs text-slate-500 line-clamp-1">

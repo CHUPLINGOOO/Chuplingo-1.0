@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { COURSES } from '../data/coursesData';
 import { Question, QuestionAttempt, CourseId, PracticeMode } from '../types/chuplingo';
@@ -6,78 +6,24 @@ import { useChuplingo } from '../context/ChuplingoContext';
 import { Star, ArrowRight, CheckCircle2, XCircle, Lightbulb, ArrowLeft, Timer, Sparkles, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
-function shuffleArray<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
-
 const PracticeQuestionScreen: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { allQuestions, mistakes, favoriteQuestionIds, toggleFavorite, isFavorite, recordSession, isLoadingQuestions } = useChuplingo();
+  const { 
+    fetchQuestionsForSession, 
+    toggleFavorite, 
+    isFavorite, 
+    recordSession, 
+    isLoadingQuestions 
+  } = useChuplingo();
 
   const courseParam = (searchParams.get('course') as CourseId) || 'literatura';
   const topicParam = searchParams.get('topic') || 'all';
   const modeParam = (searchParams.get('mode') as PracticeMode) || 'rapida';
   const difficultyParam = searchParams.get('difficulty') || 'todas';
 
-  // Filter questions dynamically from Supabase questions cache with Fisher-Yates randomization and zero duplicates
-  const sessionQuestions = useMemo(() => {
-    if (!allQuestions || allQuestions.length === 0) return [];
-
-    let pool: Question[] = [];
-
-    if (modeParam === 'simulacro') {
-      pool = [...allQuestions];
-    } else if (modeParam === 'errores') {
-      const mistakenIds = mistakes.filter(m => !m.dominada).map(m => m.questionId);
-      pool = allQuestions.filter(q => mistakenIds.includes(q.id));
-    } else if (modeParam === 'favoritos') {
-      pool = allQuestions.filter(q => favoriteQuestionIds.includes(q.id));
-    } else {
-      pool = allQuestions.filter(q => {
-        const matchesCourse = q.courseId === courseParam;
-        const matchesTopic = topicParam === 'all' || 
-          (q.topicId && q.topicId.toLowerCase() === topicParam.toLowerCase()) ||
-          (q.topicName && q.topicName.toLowerCase() === topicParam.toLowerCase());
-        const matchesDiff = difficultyParam === 'todas' || q.dificultad === difficultyParam;
-        return matchesCourse && matchesTopic && matchesDiff;
-      });
-
-      // Fallback within course if specific topic was not assigned
-      if (pool.length === 0) {
-        pool = allQuestions.filter(q => q.courseId === courseParam);
-      }
-    }
-
-    if (pool.length === 0) {
-      pool = allQuestions;
-    }
-
-    // Deduplicate by ID
-    const uniqueMap = new Map<string, Question>();
-    pool.forEach(q => {
-      if (!uniqueMap.has(q.id)) {
-        uniqueMap.set(q.id, q);
-      }
-    });
-
-    const uniqueQuestions = Array.from(uniqueMap.values());
-    const randomized = shuffleArray(uniqueQuestions);
-
-    const limit = 
-      modeParam === 'rapida' ? 10 : 
-      modeParam === 'estandar' ? 20 : 
-      modeParam === 'intensiva' ? 30 : 
-      modeParam === 'simulacro' ? 25 : 
-      randomized.length;
-
-    return randomized.slice(0, Math.min(limit, randomized.length));
-  }, [allQuestions, courseParam, topicParam, modeParam, difficultyParam, mistakes, favoriteQuestionIds]);
+  const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const activeCourse = COURSES.find(c => c.id === courseParam) || COURSES[0];
 
@@ -88,6 +34,37 @@ const PracticeQuestionScreen: React.FC = () => {
   const [startTime] = useState<number>(Date.now());
   const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
   const [secondsRemaining, setSecondsRemaining] = useState<number>(modeParam === 'simulacro' ? 1500 : 0);
+
+  // Fetch session questions directly from Supabase with requested count & topic
+  useEffect(() => {
+    let isMounted = true;
+    const loadSession = async () => {
+      const questionsCount = 
+        modeParam === 'rapida' ? 10 :
+        modeParam === 'estandar' ? 20 :
+        modeParam === 'intensiva' ? 30 :
+        modeParam === 'simulacro' ? 25 : 10;
+
+      const questions = await fetchQuestionsForSession({
+        courseId: courseParam,
+        topicId: topicParam,
+        mode: modeParam,
+        difficulty: difficultyParam,
+        count: questionsCount
+      });
+
+      if (isMounted) {
+        setSessionQuestions(questions);
+        setHasLoaded(true);
+      }
+    };
+
+    loadSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [courseParam, topicParam, modeParam, difficultyParam, fetchQuestionsForSession]);
 
   const currentQuestion = sessionQuestions[currentIndex];
   const isLastQuestion = currentIndex === sessionQuestions.length - 1;
@@ -113,11 +90,12 @@ const PracticeQuestionScreen: React.FC = () => {
     setIsAnswerLocked(false);
   }, [currentIndex]);
 
-  if (isLoadingQuestions) {
+  if (isLoadingQuestions || !hasLoaded) {
     return (
       <div className="min-h-screen bg-[#F7F8FC] flex flex-col items-center justify-center p-6 text-center">
         <Sparkles className="w-10 h-10 text-[#F05C54] animate-spin mb-3" />
-        <p className="text-sm font-black text-[#183153]">Consultando preguntas desde Supabase...</p>
+        <p className="text-sm font-black text-[#183153]">Cargando preguntas de Supabase...</p>
+        <p className="text-xs text-slate-400 mt-1">Conectando con el banco de preguntas</p>
       </div>
     );
   }
@@ -126,15 +104,15 @@ const PracticeQuestionScreen: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#F7F8FC] flex flex-col items-center justify-center p-6 text-center">
         <AlertTriangle className="w-12 h-12 text-amber-500 mb-3" />
-        <h2 className="text-base font-black text-[#183153]">No hay preguntas disponibles en Supabase</h2>
+        <h2 className="text-base font-black text-[#183153]">No se encontraron preguntas en Supabase</h2>
         <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
-          Verifica que la tabla <code>questions</code> de Supabase contenga preguntas activas.
+          Verifica que la tabla <code>questions</code> contenga preguntas activas para {activeCourse.nombre}.
         </p>
         <button
-          onClick={() => navigate('/admin')}
+          onClick={() => navigate('/courses')}
           className="mt-5 px-5 py-2.5 bg-[#183153] text-white rounded-2xl text-xs font-black"
         >
-          Ir al Panel de Administración
+          Volver a Cursos
         </button>
       </div>
     );
