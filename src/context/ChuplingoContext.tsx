@@ -243,7 +243,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   });
 
-  // Map database row from Supabase to Question
+  // Map database row from Supabase public.questions to Question model
   const mapDbQuestion = (dbQ: any): Question => {
     const course = COURSES.find(c => c.id === dbQ.course_id);
     const topic = course?.temas.find(t => t.id === dbQ.topic_id);
@@ -286,6 +286,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         .order('created_at', { ascending: false });
 
       if (error) {
+        console.error('[Supabase questions fetch error]', error);
         toast.error(`Error al conectar con Supabase: ${error.message}`);
         setAllQuestions([]);
         return;
@@ -296,7 +297,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setAllQuestions(mapped);
       }
     } catch (err: any) {
-      console.error('Error fetching questions from Supabase', err);
+      console.error('[Supabase connection exception]', err);
       toast.error('No se pudo establecer conexión con Supabase');
     } finally {
       setIsLoadingQuestions(false);
@@ -397,7 +398,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setMistakes(mappedMistakes);
       }
     } catch (err) {
-      console.error('Error fetching Supabase user data', err);
+      console.error('[Supabase user data loading error]', err);
     }
   };
 
@@ -428,7 +429,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           loadUserDataFromSupabase(session.user.id);
         }
       } catch (err) {
-        console.error('Error fetching Supabase session', err);
+        console.error('[Supabase auth session error]', err);
       }
     };
 
@@ -873,7 +874,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // Insert practice_session and attempts into Supabase
     if (isAuthenticated && !user.id.startsWith('guest-')) {
       try {
-        const { data: dbSession, error: sessionErr } = await supabase
+        const { data: dbSession } = await supabase
           .from('practice_sessions')
           .insert({
             user_id: user.id,
@@ -1101,7 +1102,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Bulk import batch of 100 questions into Supabase
+  // Bulk import batch into Supabase
   const importQuestionsBatch = async (batchQuestions: any[]): Promise<number> => {
     try {
       if (!Array.isArray(batchQuestions) || batchQuestions.length === 0) {
