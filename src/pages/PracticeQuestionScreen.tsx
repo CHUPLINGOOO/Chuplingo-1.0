@@ -3,10 +3,9 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { COURSES } from '../data/coursesData';
 import { Question, QuestionAttempt, CourseId, PracticeMode } from '../types/chuplingo';
 import { useChuplingo } from '../context/ChuplingoContext';
-import { Star, ArrowRight, CheckCircle2, XCircle, Clock, Lightbulb, ArrowLeft, Timer, Sparkles, AlertTriangle } from 'lucide-react';
+import { Star, ArrowRight, CheckCircle2, XCircle, Lightbulb, ArrowLeft, Timer, Sparkles, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Fisher-Yates shuffle algorithm for true randomness
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -26,7 +25,7 @@ const PracticeQuestionScreen: React.FC = () => {
   const modeParam = (searchParams.get('mode') as PracticeMode) || 'rapida';
   const difficultyParam = searchParams.get('difficulty') || 'todas';
 
-  // Filter relevant questions solely from Supabase with deduplication and randomized shuffle
+  // Filter questions dynamically from Supabase questions cache with Fisher-Yates randomization and zero duplicates
   const sessionQuestions = useMemo(() => {
     if (!allQuestions || allQuestions.length === 0) return [];
 
@@ -42,15 +41,19 @@ const PracticeQuestionScreen: React.FC = () => {
     } else {
       pool = allQuestions.filter(q => {
         const matchesCourse = q.courseId === courseParam;
-        const matchesTopic = topicParam === 'all' || q.topicId === topicParam;
+        const matchesTopic = topicParam === 'all' || 
+          (q.topicId && q.topicId.toLowerCase() === topicParam.toLowerCase()) ||
+          (q.topicName && q.topicName.toLowerCase() === topicParam.toLowerCase());
         const matchesDiff = difficultyParam === 'todas' || q.dificultad === difficultyParam;
         return matchesCourse && matchesTopic && matchesDiff;
       });
+
+      // Fallback within course if specific topic was not assigned
+      if (pool.length === 0) {
+        pool = allQuestions.filter(q => q.courseId === courseParam);
+      }
     }
 
-    if (pool.length === 0) {
-      pool = allQuestions.filter(q => q.courseId === courseParam);
-    }
     if (pool.length === 0) {
       pool = allQuestions;
     }
@@ -89,7 +92,6 @@ const PracticeQuestionScreen: React.FC = () => {
   const currentQuestion = sessionQuestions[currentIndex];
   const isLastQuestion = currentIndex === sessionQuestions.length - 1;
 
-  // Countdown timer for simulacro mode
   useEffect(() => {
     if (modeParam !== 'simulacro') return;
     const interval = setInterval(() => {
@@ -126,7 +128,7 @@ const PracticeQuestionScreen: React.FC = () => {
         <AlertTriangle className="w-12 h-12 text-amber-500 mb-3" />
         <h2 className="text-base font-black text-[#183153]">No hay preguntas disponibles en Supabase</h2>
         <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
-          Las preguntas deben cargarse en la tabla <code>questions</code> de Supabase para poder iniciar una práctica.
+          Verifica que la tabla <code>questions</code> de Supabase contenga preguntas activas.
         </p>
         <button
           onClick={() => navigate('/admin')}

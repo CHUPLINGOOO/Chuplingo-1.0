@@ -87,6 +87,10 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: 'chuplingo_notifications_v2.0'
 };
 
+const isValidUUID = (id: string): boolean => {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
+
 const getTodayDateString = (): string => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -108,6 +112,19 @@ const calculateLevelInfo = (xp: number) => {
     }
   }
   return { level, title };
+};
+
+const normalizeCourseId = (val: string): CourseId => {
+  const clean = (val || '').toLowerCase().trim().replace(/_/g, '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (clean.includes('literatura')) return 'literatura';
+  if (clean.includes('psicolog')) return 'psicologia';
+  if (clean.includes('geograf')) return 'geografia';
+  if (clean.includes('razonamiento') || clean.includes('verbal')) return 'razonamiento-verbal';
+  if (clean.includes('civic')) return 'civica';
+  if (clean.includes('filosof')) return 'filosofia';
+  if (clean.includes('ingl') || clean.includes('english')) return 'ingles';
+  if (clean.includes('biolog')) return 'biologia';
+  return 'literatura';
 };
 
 const INITIAL_USER: UserProfile = {
@@ -243,18 +260,33 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   });
 
-  // Map database row from Supabase public.questions to Question model
+  // Map database row from Supabase public.questions to clean Question model
   const mapDbQuestion = (dbQ: any): Question => {
-    const course = COURSES.find(c => c.id === dbQ.course_id);
-    const topic = course?.temas.find(t => t.id === dbQ.topic_id);
+    const normalizedCourse = normalizeCourseId(dbQ.course_id);
+    const course = COURSES.find(c => c.id === normalizedCourse);
+
+    const rawTopic = (dbQ.topic_id || '').toString().trim();
+    const topic = course?.temas.find(t => 
+      t.id.toLowerCase() === rawTopic.toLowerCase() ||
+      t.nombre.toLowerCase() === rawTopic.toLowerCase() ||
+      rawTopic.toLowerCase().includes(t.nombre.toLowerCase()) ||
+      t.nombre.toLowerCase().includes(rawTopic.toLowerCase()) ||
+      String(t.numero) === rawTopic
+    );
+
+    const topicId = topic?.id || dbQ.topic_id || undefined;
+    const topicName = topic?.nombre || dbQ.topic_id || 'Tema General';
+
+    const rawCorrect = (dbQ.correct_answer || 'A').toString().toUpperCase().trim().replace(/[^A-E]/g, '') || 'A';
+    const cleanCorrect = (['A', 'B', 'C', 'D', 'E'].includes(rawCorrect) ? rawCorrect : 'A') as 'A' | 'B' | 'C' | 'D' | 'E';
 
     return {
-      id: dbQ.id,
-      courseId: dbQ.course_id as CourseId,
-      topicId: dbQ.topic_id || undefined,
-      topicName: topic?.nombre || dbQ.topic_id || 'Tema General',
+      id: String(dbQ.id),
+      courseId: normalizedCourse,
+      topicId: topicId,
+      topicName: topicName,
       subtopic: dbQ.subtopic || undefined,
-      pregunta: dbQ.question,
+      pregunta: dbQ.question || '',
       alternativas: [
         { id: 'A', text: dbQ.option_a || '' },
         { id: 'B', text: dbQ.option_b || '' },
@@ -262,7 +294,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         { id: 'D', text: dbQ.option_d || '' },
         { id: 'E', text: dbQ.option_e || '' },
       ],
-      respuestaCorrecta: (dbQ.correct_answer?.toUpperCase() || 'A') as 'A' | 'B' | 'C' | 'D' | 'E',
+      respuestaCorrecta: cleanCorrect,
       explicacion: dbQ.explanation || '',
       fuente: dbQ.origin || dbQ.source_document || 'Admisión Universitaria',
       sourceDocument: dbQ.source_document || undefined,
@@ -301,8 +333,9 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
-  // Helper to load user profile, sessions, favorites and mistakes from Supabase
   const loadUserDataFromSupabase = async (userId: string) => {
+    if (!isValidUUID(userId)) return;
+
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -738,7 +771,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     }));
 
-    if (isAuthenticated && !user.id.startsWith('guest-')) {
+    if (isAuthenticated && isValidUUID(user.id)) {
       supabase.from('profiles').update({
         plan: planId.toUpperCase(),
         updated_at: new Date().toISOString()
@@ -856,7 +889,8 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setUser(updatedUser);
     setSessions(prev => [newSession, ...prev]);
 
-    if (isAuthenticated && !user.id.startsWith('guest-')) {
+    // Save session, attempts, and profile to Supabase if authenticated with valid UUID
+    if (isAuthenticated && isValidUUID(user.id)) {
       try {
         const { data: dbSession } = await supabase
           .from('practice_sessions')
@@ -914,7 +948,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isFav = false;
         toast.info('Pregunta eliminada de favoritos');
 
-        if (isAuthenticated && !user.id.startsWith('guest-')) {
+        if (isAuthenticated && isValidUUID(user.id)) {
           supabase.from('favorites').delete().match({ user_id: user.id, question_id: questionId });
         }
 
@@ -923,7 +957,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isFav = true;
         toast.success('⭐ Pregunta guardada en tus favoritos');
 
-        if (isAuthenticated && !user.id.startsWith('guest-')) {
+        if (isAuthenticated && isValidUUID(user.id)) {
           supabase.from('favorites').insert({ user_id: user.id, question_id: questionId });
         }
 
@@ -944,7 +978,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     }));
 
-    if (isAuthenticated && !user.id.startsWith('guest-') && prefs.metaDiaria) {
+    if (isAuthenticated && isValidUUID(user.id) && prefs.metaDiaria) {
       supabase.from('profiles').update({ daily_goal: prefs.metaDiaria }).eq('id', user.id);
     }
 
@@ -960,7 +994,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       apellido: finalLastName 
     }));
 
-    if (isAuthenticated && !user.id.startsWith('guest-')) {
+    if (isAuthenticated && isValidUUID(user.id)) {
       supabase.from('profiles').update({
         first_name: name.trim(),
         last_name: finalLastName,
@@ -986,7 +1020,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       tituloNivel: newTitle
     }));
 
-    if (isAuthenticated && !user.id.startsWith('guest-')) {
+    if (isAuthenticated && isValidUUID(user.id)) {
       supabase.from('profiles').update({
         xp: newXP,
         level: newLevel,
@@ -1153,7 +1187,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const totalQuestions = courseSessions.reduce((acc, s) => acc + s.totalPreguntas, 0);
     const totalCorrect = courseSessions.reduce((acc, s) => acc + s.correctas, 0);
-    const accuracy = Math.round((totalCorrect / totalQuestions) * 100);
+    const accuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
 
     const completedTopics = new Set<string>();
     courseSessions.forEach(s => {
