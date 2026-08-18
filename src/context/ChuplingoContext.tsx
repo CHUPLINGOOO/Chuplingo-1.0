@@ -13,7 +13,7 @@ import {
   NotificationItem,
   PlanId
 } from '../types/chuplingo';
-import { COURSES, INITIAL_QUESTIONS, LEVEL_THRESHOLDS } from '../data/coursesData';
+import { COURSES, LEVEL_THRESHOLDS } from '../data/coursesData';
 import { INITIAL_CHALLENGES } from '../data/challengesData';
 import { INITIAL_ACHIEVEMENTS } from '../data/achievementsData';
 import { supabase } from '../integrations/supabase/client';
@@ -44,7 +44,7 @@ interface ChuplingoContextType {
   deleteUserAccount: () => Promise<void>;
   exportUserDataJSON: () => string;
   // Session & Practice
-  recordSession: (sessionData: Omit<PracticeSession, 'id' | 'userId' | 'fecha' | 'xpGanado'>) => PracticeSession;
+  recordSession: (sessionData: Omit<PracticeSession, 'id' | 'userId' | 'fecha' | 'xpGanado'>) => Promise<PracticeSession>;
   toggleFavorite: (questionId: string) => boolean;
   isFavorite: (questionId: string) => boolean;
   // Preferences & Plans
@@ -82,7 +82,6 @@ const STORAGE_KEYS = {
   SESSIONS: 'chuplingo_sessions_v2.0',
   FAVORITES: 'chuplingo_favorites_v2.0',
   MISTAKES: 'chuplingo_mistakes_v2.0',
-  CUSTOM_QUESTIONS: 'chuplingo_custom_questions_v2.0',
   ACHIEVEMENTS: 'chuplingo_achievements_v2.0',
   CLAIMED_CHALLENGES: 'chuplingo_claimed_challenges_v2.0',
   NOTIFICATIONS: 'chuplingo_notifications_v2.0'
@@ -179,6 +178,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState<boolean>(false);
+  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
 
   const [sessions, setSessions] = useState<PracticeSession[]>(() => {
     try {
@@ -243,17 +243,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   });
 
-  const [supabaseQuestions, setSupabaseQuestions] = useState<Question[]>([]);
-  const [customQuestions, setCustomQuestions] = useState<Question[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.CUSTOM_QUESTIONS);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  // Map database question row to Question interface
+  // Map database row from Supabase to Question
   const mapDbQuestion = (dbQ: any): Question => {
     const course = COURSES.find(c => c.id === dbQ.course_id);
     const topic = course?.temas.find(t => t.id === dbQ.topic_id);
@@ -285,7 +275,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   };
 
-  // Fetch questions from Supabase table `questions`
+  // Fetch questions STRICTLY from Supabase table questions
   const fetchQuestionsFromSupabase = useCallback(async () => {
     try {
       setIsLoadingQuestions(true);
@@ -296,25 +286,22 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.warn('Could not fetch questions from Supabase, using local defaults', error);
+        toast.error(`Error al conectar con Supabase: ${error.message}`);
+        setAllQuestions([]);
         return;
       }
 
-      if (data && data.length > 0) {
+      if (data) {
         const mapped = data.map(mapDbQuestion);
-        setSupabaseQuestions(mapped);
+        setAllQuestions(mapped);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching questions from Supabase', err);
+      toast.error('No se pudo establecer conexión con Supabase');
     } finally {
       setIsLoadingQuestions(false);
     }
   }, []);
-
-  // Questions precedence: Supabase questions if present > customQuestions > initial Questions
-  const allQuestions = supabaseQuestions.length > 0 
-    ? supabaseQuestions 
-    : [...customQuestions, ...INITIAL_QUESTIONS];
 
   // Helper to load user profile, sessions, favorites and mistakes from Supabase
   const loadUserDataFromSupabase = async (userId: string) => {
@@ -505,10 +492,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
   }, [notifications]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CUSTOM_QUESTIONS, JSON.stringify(customQuestions));
-  }, [customQuestions]);
 
   // Audio feedback helper
   const playSoundEffect = (type: 'correct' | 'complete' | 'level') => {
@@ -779,7 +762,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // Record practice session in Supabase & state
-  const recordSession = (sessionData: Omit<PracticeSession, 'id' | 'userId' | 'fecha' | 'xpGanado'>): PracticeSession => {
+  const recordSession = async (sessionData: Omit<PracticeSession, 'id' | 'userId' | 'fecha' | 'xpGanado'>): Promise<PracticeSession> => {
     const today = getTodayDateString();
     const yesterday = getYesterdayDateString();
 
@@ -800,7 +783,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       xpGanado: sessionXP
     };
 
-    // Update Mistakes & question progress
+    // Update Mistakes
     const updatedMistakes = [...mistakes];
     sessionData.attempts.forEach(attempt => {
       const existingIdx = updatedMistakes.findIndex(m => m.questionId === attempt.questionId);
@@ -887,56 +870,54 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setUser(updatedUser);
     setSessions(prev => [newSession, ...prev]);
 
-    // Asynchronously insert session and attempts in Supabase
+    // Insert practice_session and attempts into Supabase
     if (isAuthenticated && !user.id.startsWith('guest-')) {
-      (async () => {
-        try {
-          const { data: dbSession } = await supabase
-            .from('practice_sessions')
-            .insert({
-              user_id: user.id,
-              course_id: sessionData.courseId || null,
-              topic_id: sessionData.topicId || null,
-              mode: sessionData.mode,
-              total_questions: sessionData.totalPreguntas,
-              correct_answers: sessionData.correctas,
-              incorrect_answers: sessionData.incorrectas,
-              accuracy: sessionData.porcentaje,
-              duration_seconds: sessionData.duracionSegundos,
-              xp_earned: sessionXP,
-              completed_at: new Date().toISOString()
-            })
-            .select('id')
-            .single();
+      try {
+        const { data: dbSession, error: sessionErr } = await supabase
+          .from('practice_sessions')
+          .insert({
+            user_id: user.id,
+            course_id: sessionData.courseId || null,
+            topic_id: sessionData.topicId || null,
+            mode: sessionData.mode,
+            total_questions: sessionData.totalPreguntas,
+            correct_answers: sessionData.correctas,
+            incorrect_answers: sessionData.incorrectas,
+            accuracy: sessionData.porcentaje,
+            duration_seconds: sessionData.duracionSegundos,
+            xp_earned: sessionXP,
+            completed_at: new Date().toISOString()
+          })
+          .select('id')
+          .single();
 
-          if (dbSession?.id && sessionData.attempts.length > 0) {
-            const attemptPayloads = sessionData.attempts.map(att => ({
-              user_id: user.id,
-              session_id: dbSession.id,
-              question_id: att.questionId,
-              selected_answer: att.respuestaSeleccionada,
-              is_correct: att.esCorrecta,
-              time_seconds: att.tiempoSegundos
-            }));
+        if (dbSession?.id && sessionData.attempts.length > 0) {
+          const attemptPayloads = sessionData.attempts.map(att => ({
+            user_id: user.id,
+            session_id: dbSession.id,
+            question_id: att.questionId,
+            selected_answer: att.respuestaSeleccionada,
+            is_correct: att.esCorrecta,
+            time_seconds: att.tiempoSegundos
+          }));
 
-            await supabase.from('attempts').insert(attemptPayloads);
-          }
-
-          // Update user profile in Supabase
-          await supabase
-            .from('profiles')
-            .update({
-              xp: newXP,
-              level: newLevel,
-              current_streak: newStreak,
-              best_streak: newBestStreak,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', user.id);
-        } catch (err) {
-          console.error('Error saving practice session to Supabase', err);
+          await supabase.from('attempts').insert(attemptPayloads);
         }
-      })();
+
+        // Update user profile in Supabase
+        await supabase
+          .from('profiles')
+          .update({
+            xp: newXP,
+            level: newLevel,
+            current_streak: newStreak,
+            best_streak: newBestStreak,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+      } catch (err) {
+        console.error('Error saving practice session to Supabase', err);
+      }
     }
 
     return newSession;
@@ -1056,7 +1037,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setMistakes([]);
     setClaimedChallengeIds([]);
     setAchievements(INITIAL_ACHIEVEMENTS);
-    setCustomQuestions([]);
+    setAllQuestions([]);
     toast.info('Se han restablecido todos los datos locales');
   };
 
@@ -1080,7 +1061,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         source_document: newQ.sourceDocument || null,
         source_page: newQ.sourcePage || null,
         origin: newQ.origin || newQ.fuente || 'Banco Chuplingo',
-        official_exam_question: !!newQ.officialExamQuestion,
+        official_exam_question: false,
         active: true
       };
 
@@ -1092,14 +1073,11 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       if (error) {
         toast.error(`Error de Supabase: ${error.message}`);
-        // Fallback local
-        const fallbackQ: Question = { ...newQ, id: `custom-q-${Date.now()}` };
-        setCustomQuestions(prev => [fallbackQ, ...prev]);
-        return fallbackQ;
+        return null;
       }
 
       const mapped = mapDbQuestion(data);
-      setSupabaseQuestions(prev => [mapped, ...prev]);
+      setAllQuestions(prev => [mapped, ...prev]);
       toast.success('Pregunta guardada exitosamente en Supabase');
       return mapped;
     } catch (err: any) {
@@ -1111,11 +1089,12 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const deleteQuestionFromBank = async (id: string): Promise<boolean> => {
     try {
       const { error } = await supabase.from('questions').delete().eq('id', id);
-      if (!error) {
-        setSupabaseQuestions(prev => prev.filter(q => q.id !== id));
+      if (error) {
+        toast.error(`Error al eliminar: ${error.message}`);
+        return false;
       }
-      setCustomQuestions(prev => prev.filter(q => q.id !== id));
-      toast.success('Pregunta eliminada');
+      setAllQuestions(prev => prev.filter(q => q.id !== id));
+      toast.success('Pregunta eliminada de Supabase');
       return true;
     } catch {
       return false;
@@ -1131,34 +1110,35 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       const payloads = batchQuestions.map(q => ({
+        id: q.id || undefined,
         course_id: q.course_id || q.courseId,
         topic_id: q.topic_id || q.topicId || null,
         subtopic: q.subtopic || null,
         difficulty: (q.difficulty || q.dificultad || 'intermedio').toLowerCase(),
-        question_type: q.question_type || q.questionType || 'multiple_choice',
+        question_type: q.question_type || q.questionType || 'completar_enunciado',
         question: q.question || q.pregunta,
         option_a: q.option_a || q.alternativas?.find((a: any) => a.id === 'A')?.text || '',
         option_b: q.option_b || q.alternativas?.find((a: any) => a.id === 'B')?.text || '',
         option_c: q.option_c || q.alternativas?.find((a: any) => a.id === 'C')?.text || '',
         option_d: q.option_d || q.alternativas?.find((a: any) => a.id === 'D')?.text || '',
         option_e: q.option_e || q.alternativas?.find((a: any) => a.id === 'E')?.text || '',
-        correct_answer: (q.correct_answer || q.respuestaCorrecta || 'A').toUpperCase(),
+        correct_answer: (q.correct_answer || q.respuestaCorrecta || 'A').toUpperCase().trim(),
         explanation: q.explanation || q.explicacion || '',
         source_document: q.source_document || q.sourceDocument || null,
         source_page: q.source_page || q.sourcePage || null,
-        origin: q.origin || q.fuente || 'Examen de Admisión',
-        official_exam_question: q.official_exam_question !== undefined ? !!q.official_exam_question : true,
+        origin: q.origin || q.fuente || 'pregunta_generada_a_partir_del_contenido_fuente',
+        official_exam_question: false,
         active: true
       })).filter(p => p.course_id && p.question && p.option_a && p.option_b && p.option_c && p.option_d && p.option_e && p.correct_answer);
 
       if (payloads.length === 0) {
-        toast.error('No se encontraron preguntas con la estructura completa requerida');
+        toast.error('No se encontraron preguntas con la estructura requerida');
         return 0;
       }
 
       const { data, error } = await supabase
         .from('questions')
-        .insert(payloads)
+        .upsert(payloads, { onConflict: 'id' })
         .select('*');
 
       if (error) {

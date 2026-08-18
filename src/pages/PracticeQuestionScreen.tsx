@@ -3,10 +3,10 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { COURSES } from '../data/coursesData';
 import { Question, QuestionAttempt, CourseId, PracticeMode } from '../types/chuplingo';
 import { useChuplingo } from '../context/ChuplingoContext';
-import { Star, ArrowRight, CheckCircle2, XCircle, Clock, Lightbulb, ArrowLeft, Timer, Sparkles } from 'lucide-react';
+import { Star, ArrowRight, CheckCircle2, XCircle, Clock, Lightbulb, ArrowLeft, Timer, Sparkles, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Fisher-Yates array shuffler to guarantee no repeats and true randomness
+// Fisher-Yates shuffle algorithm for true randomness
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -26,8 +26,10 @@ const PracticeQuestionScreen: React.FC = () => {
   const modeParam = (searchParams.get('mode') as PracticeMode) || 'rapida';
   const difficultyParam = searchParams.get('difficulty') || 'todas';
 
-  // Filter relevant questions for this session with deduplication and randomized shuffle
+  // Filter relevant questions solely from Supabase with deduplication and randomized shuffle
   const sessionQuestions = useMemo(() => {
+    if (!allQuestions || allQuestions.length === 0) return [];
+
     let pool: Question[] = [];
 
     if (modeParam === 'simulacro') {
@@ -53,7 +55,7 @@ const PracticeQuestionScreen: React.FC = () => {
       pool = allQuestions;
     }
 
-    // Deduplicate by question ID
+    // Deduplicate by ID
     const uniqueMap = new Map<string, Question>();
     pool.forEach(q => {
       if (!uniqueMap.has(q.id)) {
@@ -113,7 +115,7 @@ const PracticeQuestionScreen: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#F7F8FC] flex flex-col items-center justify-center p-6 text-center">
         <Sparkles className="w-10 h-10 text-[#F05C54] animate-spin mb-3" />
-        <p className="text-sm font-black text-[#183153]">Cargando preguntas de Chuplingo...</p>
+        <p className="text-sm font-black text-[#183153]">Consultando preguntas desde Supabase...</p>
       </div>
     );
   }
@@ -121,12 +123,16 @@ const PracticeQuestionScreen: React.FC = () => {
   if (!currentQuestion) {
     return (
       <div className="min-h-screen bg-[#F7F8FC] flex flex-col items-center justify-center p-6 text-center">
-        <p className="text-sm font-bold text-slate-600">No se encontraron preguntas para esta configuración.</p>
+        <AlertTriangle className="w-12 h-12 text-amber-500 mb-3" />
+        <h2 className="text-base font-black text-[#183153]">No hay preguntas disponibles en Supabase</h2>
+        <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
+          Las preguntas deben cargarse en la tabla <code>questions</code> de Supabase para poder iniciar una práctica.
+        </p>
         <button
-          onClick={() => navigate('/practice-setup')}
-          className="mt-4 px-5 py-2.5 bg-[#F05C54] text-white rounded-2xl text-xs font-black"
+          onClick={() => navigate('/admin')}
+          className="mt-5 px-5 py-2.5 bg-[#183153] text-white rounded-2xl text-xs font-black"
         >
-          Volver a Selección
+          Ir al Panel de Administración
         </button>
       </div>
     );
@@ -154,7 +160,7 @@ const PracticeQuestionScreen: React.FC = () => {
     setAttempts(prev => [...prev, attempt]);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!isAnswerLocked) {
       toast.info('Selecciona una alternativa antes de continuar');
       return;
@@ -167,7 +173,7 @@ const PracticeQuestionScreen: React.FC = () => {
       const incorrectas = total - correctas;
       const porcentaje = total > 0 ? Math.round((correctas / total) * 100) : 0;
 
-      const newSession = recordSession({
+      const newSession = await recordSession({
         courseId: modeParam === 'simulacro' ? undefined : activeCourse.id,
         courseName: modeParam === 'simulacro' ? 'Simulacro Tipo Admisión' : activeCourse.nombre,
         topicId: topicParam !== 'all' ? topicParam : undefined,
@@ -269,7 +275,7 @@ const PracticeQuestionScreen: React.FC = () => {
             Nivel {currentQuestion.dificultad}
           </span>
           {currentQuestion.fuente && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 truncate max-w-[200px]">
               {currentQuestion.fuente}
             </span>
           )}

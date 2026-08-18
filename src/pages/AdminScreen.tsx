@@ -4,8 +4,7 @@ import { AppHeader } from '../components/layout/AppHeader';
 import { useChuplingo } from '../context/ChuplingoContext';
 import { COURSES } from '../data/coursesData';
 import { CourseId, QuestionDifficulty } from '../types/chuplingo';
-import { BATCH_100_RAW_CSV } from '../data/initialBatch100';
-import { Shield, Plus, Upload, Trash2, Database, BarChart3, Check, FileSpreadsheet, RefreshCw, Zap } from 'lucide-react';
+import { Shield, Plus, Upload, Trash2, Database, BarChart3, Check, FileSpreadsheet, RefreshCw, FileUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 // CSV to JSON parser handling quoted lines
@@ -95,28 +94,46 @@ const AdminScreen: React.FC = () => {
 
   // Bulk Importer State
   const [batchFormat, setBatchFormat] = useState<'json' | 'csv'>('csv');
-  const [batchRawText, setBatchRawText] = useState(BATCH_100_RAW_CSV);
+  const [batchRawText, setBatchRawText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
 
   const stats = getOverallStats();
 
-  const handleProcessBatch = async (textToProcess?: string) => {
-    const raw = textToProcess || batchRawText;
-    if (!raw.trim()) {
-      toast.error('Pega el contenido CSV o JSON con las preguntas');
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (text) {
+        setBatchRawText(text);
+        if (file.name.endsWith('.json')) {
+          setBatchFormat('json');
+        } else {
+          setBatchFormat('csv');
+        }
+        toast.success(`Archivo "${file.name}" cargado listo para importar.`);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleProcessBatch = async () => {
+    if (!batchRawText.trim()) {
+      toast.error('Pega o selecciona un archivo CSV o JSON con las preguntas');
       return;
     }
 
     setIsImporting(true);
     try {
       let parsedArray: any[] = [];
-      if (batchFormat === 'json' && !textToProcess) {
-        parsedArray = JSON.parse(raw);
+      if (batchFormat === 'json') {
+        parsedArray = JSON.parse(batchRawText);
       } else {
-        parsedArray = parseCSVToQuestions(raw);
+        parsedArray = parseCSVToQuestions(batchRawText);
       }
 
-      // Normalize course names and topics according to the 8 official courses
       const mapped = parsedArray.map(item => {
         const rawCourse = (item.course || item.course_id || '').toLowerCase().trim();
         const normalizedCourseId = COURSE_NAME_MAP[rawCourse] || 'literatura';
@@ -127,7 +144,7 @@ const AdminScreen: React.FC = () => {
         else diff = 'intermedio';
 
         return {
-          id: item.id,
+          id: item.id || undefined,
           course_id: normalizedCourseId,
           topic_id: item.topic || item.topic_id || 'Tema General',
           subtopic: item.subtopic || null,
@@ -139,7 +156,7 @@ const AdminScreen: React.FC = () => {
           option_c: item.option_c,
           option_d: item.option_d,
           option_e: item.option_e,
-          correct_answer: (item.correct_answer || 'A').toUpperCase().trim(),
+          correct_answer: (item.correct_answer || item.respuestaCorrecta || 'A').toUpperCase().trim(),
           explanation: item.explanation || item.explicacion || '',
           source_document: item.source_document || null,
           source_page: item.source_page || null,
@@ -151,6 +168,7 @@ const AdminScreen: React.FC = () => {
 
       const count = await importQuestionsBatch(mapped);
       if (count > 0) {
+        setBatchRawText('');
         setActiveTab('preguntas');
       }
     } catch (e: any) {
@@ -226,7 +244,7 @@ const AdminScreen: React.FC = () => {
               activeTab === 'importar' ? 'bg-white text-[#183153] shadow-xs' : 'text-slate-600'
             }`}
           >
-            Importar 100
+            Importar
           </button>
           <button
             onClick={() => setActiveTab('preguntas')}
@@ -263,7 +281,7 @@ const AdminScreen: React.FC = () => {
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-black text-[#183153] flex items-center gap-1.5">
                 <FileSpreadsheet className="w-4 h-4 text-[#F05C54]" />
-                <span>Primer Lote Oficial (100 Preguntas)</span>
+                <span>Importador a Supabase</span>
               </h3>
               <div className="flex bg-slate-100 p-0.5 rounded-lg text-[10px] font-bold">
                 <button
@@ -282,30 +300,43 @@ const AdminScreen: React.FC = () => {
             </div>
 
             <p className="text-xs text-slate-500 leading-relaxed">
-              Importa exactamente las 100 preguntas distribuidas en los 8 cursos hacia la tabla <code>questions</code> de Supabase.
+              Sube o pega el archivo CSV / JSON de preguntas. Se insertarán directamente en la tabla <code>questions</code> de Supabase.
             </p>
 
-            {/* Quick 1-Click Import Button */}
-            <button
-              onClick={() => handleProcessBatch(BATCH_100_RAW_CSV)}
-              disabled={isImporting}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#F05C54] to-[#FF9418] hover:opacity-95 text-white font-black text-xs shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50"
-            >
-              <Zap className="w-4 h-4 fill-white" />
-              <span>{isImporting ? 'Guardando en Supabase...' : '⚡ Importar Lote de 100 Preguntas a Supabase'}</span>
-            </button>
+            {/* File input */}
+            <label className="border-2 border-dashed border-slate-200 hover:border-[#F05C54] rounded-2xl p-4 text-center cursor-pointer flex flex-col items-center justify-center gap-1 transition-colors bg-slate-50">
+              <FileUp className="w-6 h-6 text-slate-400" />
+              <span className="text-xs font-black text-[#183153]">Seleccionar archivo CSV o JSON</span>
+              <span className="text-[10px] text-slate-400 font-medium">Ej. CHUPLINGO_PRIMER_LOTE_100_PREGUNTAS.csv</span>
+              <input
+                type="file"
+                accept=".csv,.json,text/csv,application/json"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
 
-            <div className="border-t border-slate-100 pt-3">
+            <div>
               <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
-                Contenido CSV / JSON del Lote:
+                O pega el texto aquí:
               </label>
               <textarea
-                rows={7}
+                rows={6}
                 value={batchRawText}
                 onChange={(e) => setBatchRawText(e.target.value)}
+                placeholder="Pega las líneas CSV o el JSON de las preguntas..."
                 className="w-full bg-slate-50 border rounded-2xl p-2.5 text-[11px] font-mono leading-tight"
               />
             </div>
+
+            <button
+              onClick={handleProcessBatch}
+              disabled={isImporting || !batchRawText.trim()}
+              className="w-full py-4 rounded-2xl bg-[#183153] hover:bg-[#10223A] text-white font-black text-xs shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50"
+            >
+              <Upload className="w-4 h-4" />
+              <span>{isImporting ? 'Guardando en Supabase...' : 'Importar a la Base de Datos de Supabase'}</span>
+            </button>
           </div>
         )}
 
@@ -344,7 +375,7 @@ const AdminScreen: React.FC = () => {
                     <button
                       onClick={() => deleteQuestionFromBank(q.id)}
                       className="text-rose-500 p-1 hover:bg-rose-50 rounded-lg"
-                      title="Eliminar pregunta"
+                      title="Eliminar pregunta de Supabase"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -451,7 +482,7 @@ const AdminScreen: React.FC = () => {
               type="submit"
               className="w-full py-3.5 rounded-2xl bg-[#67C66A] text-white font-black text-xs shadow-md mt-2"
             >
-              Guardar Pregunta
+              Guardar Pregunta en Supabase
             </button>
           </form>
         )}
@@ -463,7 +494,7 @@ const AdminScreen: React.FC = () => {
             <div className="grid grid-cols-2 gap-2 text-center text-xs">
               <div className="p-3 bg-slate-50 rounded-2xl">
                 <span className="text-lg font-black text-[#183153] block">{allQuestions.length}</span>
-                <span className="text-[10px] text-slate-500 font-bold uppercase">Preguntas Activas</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase">Preguntas en Supabase</span>
               </div>
               <div className="p-3 bg-slate-50 rounded-2xl">
                 <span className="text-lg font-black text-[#12B7E8] block">{stats.totalSessions}</span>
