@@ -17,7 +17,6 @@ import { COURSES, LEVEL_THRESHOLDS } from '../data/coursesData';
 import { INITIAL_CHALLENGES } from '../data/challengesData';
 import { INITIAL_ACHIEVEMENTS } from '../data/achievementsData';
 import { supabase } from '../integrations/supabase/client';
-import { executeDirectPilotImport } from '../integrations/supabase/pilotSeeder';
 import { toast } from 'sonner';
 import { triggerConfetti } from '../utils/confetti';
 
@@ -33,7 +32,6 @@ interface ChuplingoContextType {
   notifications: NotificationItem[];
   isLoadingQuestions: boolean;
   fetchQuestionsFromSupabase: () => Promise<void>;
-  runPilotImport: () => Promise<void>;
   // Auth Operations
   registerUser: (data: { nombre: string; apellido: string; email: string; password: string }) => Promise<boolean>;
   loginUser: (data: { email: string; password: string }) => Promise<boolean>;
@@ -295,19 +293,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (data && data.length > 0) {
         const mapped = data.map(mapDbQuestion);
         setAllQuestions(mapped);
-      } else {
-        // If table is physically empty, run pilot seeder
-        const result = await executeDirectPilotImport();
-        if (result.success) {
-          const { data: refetched } = await supabase
-            .from('questions')
-            .select('*')
-            .eq('active', true)
-            .order('created_at', { ascending: false });
-          if (refetched) {
-            setAllQuestions(refetched.map(mapDbQuestion));
-          }
-        }
       }
     } catch (err: any) {
       console.error('[Supabase connection exception]', err);
@@ -315,16 +300,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setIsLoadingQuestions(false);
     }
   }, []);
-
-  const runPilotImport = async () => {
-    const res = await executeDirectPilotImport();
-    if (res.success) {
-      await fetchQuestionsFromSupabase();
-      toast.success(res.message);
-    } else {
-      toast.error(`Error: ${res.message}`);
-    }
-  };
 
   // Helper to load user profile, sessions, favorites and mistakes from Supabase
   const loadUserDataFromSupabase = async (userId: string) => {
@@ -1357,7 +1332,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         notifications,
         isLoadingQuestions,
         fetchQuestionsFromSupabase,
-        runPilotImport,
         registerUser,
         loginUser,
         verifyUserEmail,
