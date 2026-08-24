@@ -394,6 +394,100 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [mapDbQuestion]);
 
+  // Dynamic question fetcher for practice sessions
+  const fetchQuestionsForSession = useCallback(async (params: {
+    courseId?: CourseId;
+    topicId?: string;
+    mode: string;
+    difficulty?: string;
+    count?: number;
+  }): Promise<Question[]> => {
+    const targetCount = params.count || 10;
+
+    // Special Mode: Errores
+    if (params.mode === 'errores') {
+      const mistakeIds = mistakes.filter(m => !m.dominada).map(m => m.questionId);
+      if (mistakeIds.length === 0) return [];
+      
+      const { data } = await supabase
+        .from('questions')
+        .select('*')
+        .in('id', mistakeIds)
+        .limit(targetCount);
+
+      if (data && data.length > 0) {
+        return shuffleList(data.map(mapDbQuestion));
+      }
+      return [];
+    }
+
+    // Special Mode: Favoritos
+    if (params.mode === 'favoritos') {
+      if (favoriteQuestionIds.length === 0) return [];
+
+      const { data } = await supabase
+        .from('questions')
+        .select('*')
+        .in('id', favoriteQuestionIds)
+        .limit(targetCount);
+
+      if (data && data.length > 0) {
+        return shuffleList(data.map(mapDbQuestion));
+      }
+      return [];
+    }
+
+    // Mode: Simulacro (multi-course)
+    if (params.mode === 'simulacro') {
+      const { data, error } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('active', true)
+        .limit(Math.max(50, targetCount * 2));
+
+      if (data && data.length > 0) {
+        return shuffleList(data.map(mapDbQuestion)).slice(0, targetCount);
+      }
+      return allQuestions.slice(0, targetCount);
+    }
+
+    // Standard / Topic practice
+    let query = supabase.from('questions').select('*').eq('active', true);
+
+    if (params.courseId) {
+      query = query.ilike('course_id', `%${params.courseId}%`);
+    }
+
+    if (params.topicId && params.topicId !== 'all') {
+      query = query.or(`topic_id.ilike.%${params.topicId}%,topic_id.eq.${params.topicId}`);
+    }
+
+    if (params.difficulty && params.difficulty !== 'todas') {
+      query = query.ilike('difficulty', `%${params.difficulty}%`);
+    }
+
+    const { data, error } = await query.limit(Math.max(50, targetCount * 2));
+
+    if (error) {
+      console.error('[fetchQuestionsForSession error]', error);
+    }
+
+    if (data && data.length > 0) {
+      return shuffleList(data.map(mapDbQuestion)).slice(0, targetCount);
+    }
+
+    // Fallback filter over cached bank
+    let localFiltered = [...allQuestions];
+    if (params.courseId) {
+      localFiltered = localFiltered.filter(q => q.courseId === params.courseId);
+    }
+    if (params.topicId && params.topicId !== 'all') {
+      localFiltered = localFiltered.filter(q => q.topicId === params.topicId);
+    }
+
+    return shuffleList(localFiltered).slice(0, targetCount);
+  }, [allQuestions, mistakes, favoriteQuestionIds, mapDbQuestion]);
+
   const loadUserDataFromSupabase = async (userId: string) => {
     if (!isValidUUID(userId)) return;
 
