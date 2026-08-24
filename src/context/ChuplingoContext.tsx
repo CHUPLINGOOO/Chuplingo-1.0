@@ -74,6 +74,7 @@ interface ChuplingoContextType {
   fetchAdminSubscriptionRequests: () => Promise<SubscriptionRequest[]>;
   approveSubscriptionRequest: (requestId: string, targetUserId: string, plan: string, price: number) => Promise<boolean>;
   rejectSubscriptionRequest: (requestId: string, reason?: string) => Promise<boolean>;
+  getProofFileUrl: (rawUrlOrPath: string) => Promise<string>;
   claimChallengeReward: (challengeId: string) => void;
   resetAllProgress: () => void;
   completeOnboarding: (prefs?: { metaDiaria?: number; horarioEstudio?: string; cursosFavoritos?: CourseId[] }) => void;
@@ -296,7 +297,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   });
 
-  // Map database row from Supabase public.questions to Question format
   const mapDbQuestion = useCallback((dbQ: any): Question => {
     const normalizedCourse = normalizeCourseId(dbQ.course_id);
     const course = COURSES.find(c => c.id === normalizedCourse);
@@ -343,7 +343,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, []);
 
-  // Fetch count and initial question stats from Supabase
   const fetchQuestionsFromSupabase = useCallback(async () => {
     try {
       setIsLoadingQuestions(true);
@@ -364,7 +363,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setAllQuestions(mapped);
       }
 
-      // Compute question counts per course
       const counts: Record<string, number> = {};
       const tCounts: Record<string, number> = {};
 
@@ -395,7 +393,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [mapDbQuestion]);
 
-  // Dynamic question fetcher for practice sessions
   const fetchQuestionsForSession = useCallback(async (params: {
     courseId?: CourseId;
     topicId?: string;
@@ -405,7 +402,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }): Promise<Question[]> => {
     const targetCount = params.count || 10;
 
-    // Special Mode: Errores
     if (params.mode === 'errores') {
       const mistakeIds = mistakes.filter(m => !m.dominada).map(m => m.questionId);
       if (mistakeIds.length === 0) return [];
@@ -422,7 +418,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return [];
     }
 
-    // Special Mode: Favoritos
     if (params.mode === 'favoritos') {
       if (favoriteQuestionIds.length === 0) return [];
 
@@ -438,7 +433,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return [];
     }
 
-    // Mode: Simulacro (multi-course)
     if (params.mode === 'simulacro') {
       const { data, error } = await supabase
         .from('questions')
@@ -452,7 +446,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return allQuestions.slice(0, targetCount);
     }
 
-    // Standard / Topic practice
     let query = supabase.from('questions').select('*').eq('active', true);
 
     if (params.courseId) {
@@ -477,7 +470,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return shuffleList(data.map(mapDbQuestion)).slice(0, targetCount);
     }
 
-    // Fallback filter over cached bank
     let localFiltered = [...allQuestions];
     if (params.courseId) {
       localFiltered = localFiltered.filter(q => q.courseId === params.courseId);
@@ -525,7 +517,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }));
       }
 
-      // Check for user pending subscription
       try {
         const { data: reqData } = await supabase
           .from('subscription_requests')
@@ -552,7 +543,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           setUserPendingRequest(null);
         }
       } catch {
-        // Table might be initializing
+        // Continue
       }
 
       const { data: remoteSessions } = await supabase
@@ -939,7 +930,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return JSON.stringify(exportData, null, 2);
   };
 
-  // For Free Plan downgrade or initial setup
   const changeUserPlan = (planId: PlanId) => {
     if (planId === 'gratis') {
       setUser(prev => ({
@@ -963,7 +953,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Submit Yape subscription request with proof support
   const submitSubscriptionRequest = async (params: {
     planId: 'FAN' | 'LOVER' | 'VIP';
     price: number;
@@ -991,7 +980,10 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const { data: publicUrlData } = supabase.storage
             .from('payment_proofs')
             .getPublicUrl(filePath);
-          proofUrl = publicUrlData?.publicUrl;
+          proofUrl = publicUrlData?.publicUrl || filePath;
+        } else {
+          console.warn('Storage upload error, saving relative path', uploadError);
+          proofUrl = filePath;
         }
       }
 
@@ -1037,7 +1029,32 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Admin: Fetch all subscription requests without foreign-key join issues
+  const getProofFileUrl = async (rawUrlOrPath: string): Promise<string> => {
+    if (!rawUrlOrPath) return '';
+    if (rawUrlOrPath.startsWith('http://') || rawUrlOrPath.startsWith('https://')) {
+      return rawUrlOrPath;
+    }
+
+    try {
+      const cleanPath = rawUrlOrPath.replace(/^payment_proofs\//, '');
+      const { data } = await supabase.storage
+        .from('payment_proofs')
+        .createSignedUrl(cleanPath, 3600);
+
+      if (data?.signedUrl) {
+        return data.signedUrl;
+      }
+
+      const { data: publicData } = supabase.storage
+        .from('payment_proofs')
+        .getPublicUrl(cleanPath);
+
+      return publicData?.publicUrl || rawUrlOrPath;
+    } catch {
+      return rawUrlOrPath;
+    }
+  };
+
   const fetchAdminSubscriptionRequests = async (): Promise<SubscriptionRequest[]> => {
     try {
       const { data: reqs, error } = await supabase
@@ -1050,7 +1067,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return [];
       }
 
-      // Collect user IDs to enrich profile details
       const userIds = Array.from(new Set(reqs.map(r => r.user_id).filter(Boolean)));
       const profileMap = new Map<string, { name: string }>();
 
@@ -1070,9 +1086,10 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       return reqs.map((item: any) => {
         const profile = profileMap.get(item.user_id);
-        const normStatus = (item.status === 'approved' || item.status === 'aprobada')
+        const rawStatus = (item.status || '').toLowerCase().trim();
+        const normStatus = (rawStatus === 'approved' || rawStatus === 'aprobada')
           ? 'aprobada'
-          : (item.status === 'rejected' || item.status === 'rechazada')
+          : (rawStatus === 'rejected' || rawStatus === 'rechazada')
             ? 'rechazada'
             : 'pendiente';
 
@@ -1098,17 +1115,16 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Admin: Approve Request
   const approveSubscriptionRequest = async (requestId: string, targetUserId: string, plan: string, price: number): Promise<boolean> => {
     try {
       const nextMonth = new Date();
       nextMonth.setMonth(nextMonth.getMonth() + 1);
 
-      // 1. Update request status to 'approved' / 'aprobada'
+      // 1. Update request status to 'approved'
       const { error: reqErr } = await supabase
         .from('subscription_requests')
         .update({
-          status: 'aprobada',
+          status: 'approved',
           reviewed_at: new Date().toISOString(),
           reviewed_by: user.id
         })
@@ -1119,8 +1135,8 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return false;
       }
 
-      // 2. Insert or update active subscriptions
-      await supabase.from('subscriptions').insert({
+      // 2. Insert or update active subscription
+      await supabase.from('subscriptions').upsert({
         user_id: targetUserId,
         plan: plan.toUpperCase(),
         status: 'activa',
@@ -1128,7 +1144,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         started_at: new Date().toISOString(),
         renewal_date: nextMonth.toISOString(),
         provider: 'YAPE'
-      });
+      }, { onConflict: 'user_id' });
 
       // 3. Update target user profile plan
       await supabase.from('profiles').update({
@@ -1136,7 +1152,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         updated_at: new Date().toISOString()
       }).eq('id', targetUserId);
 
-      // If current active user is the target, update local state
+      // If active user is the approved user, update memory
       if (user.id === targetUserId) {
         setUser(prev => ({
           ...prev,
@@ -1151,7 +1167,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setUserPendingRequest(null);
       }
 
-      toast.success(`✓ Suscripción para el Plan ${plan} aprobada y activada con éxito`);
+      toast.success(`✓ Solicitud aprobada: Plan ${plan} activado para el usuario`);
       return true;
     } catch (err: any) {
       toast.error('Error al aprobar suscripción');
@@ -1159,13 +1175,12 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Admin: Reject Request
   const rejectSubscriptionRequest = async (requestId: string, reason?: string): Promise<boolean> => {
     try {
       const { error } = await supabase
         .from('subscription_requests')
         .update({
-          status: 'rechazada',
+          status: 'rejected',
           rejection_reason: reason || 'Pago no verificado',
           reviewed_at: new Date().toISOString(),
           reviewed_by: user.id
@@ -1181,7 +1196,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setUserPendingRequest(null);
       }
 
-      toast.info('Solicitud rechazada');
+      toast.info('Solicitud rechazada correctamente');
       return true;
     } catch {
       return false;
@@ -1294,7 +1309,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setUser(updatedUser);
     setSessions(prev => [newSession, ...prev]);
 
-    // Save session, attempts, and profile to Supabase if authenticated with valid UUID
     if (isAuthenticated && isValidUUID(user.id)) {
       try {
         const { data: dbSession } = await supabase
@@ -1327,7 +1341,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
           await supabase.from('attempts').insert(attemptPayloads);
 
-          // Update user question progress in Supabase
           for (const att of sessionData.attempts) {
             const { data: existingProg } = await supabase
               .from('user_question_progress')
@@ -1845,6 +1858,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         fetchAdminSubscriptionRequests,
         approveSubscriptionRequest,
         rejectSubscriptionRequest,
+        getProofFileUrl,
         claimChallengeReward,
         resetAllProgress,
         completeOnboarding,
