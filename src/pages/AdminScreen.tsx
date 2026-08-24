@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/layout/AppHeader';
 import { useChuplingo } from '../context/ChuplingoContext';
@@ -21,7 +21,13 @@ import {
   CheckCircle2, 
   AlertCircle,
   Lock,
-  ArrowLeft
+  ArrowLeft,
+  User,
+  Phone,
+  Hash,
+  DollarSign,
+  Calendar,
+  Image as ImageIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -101,6 +107,7 @@ const AdminScreen: React.FC = () => {
   const [filterCourse, setFilterCourse] = useState<CourseId | 'all'>('all');
   const [subscriptionRequests, setSubscriptionRequests] = useState<SubscriptionRequest[]>([]);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   // Single Question Form
   const [courseId, setCourseId] = useState<CourseId>('literatura');
@@ -124,19 +131,23 @@ const AdminScreen: React.FC = () => {
   const stats = getOverallStats();
   const isAdmin = isAuthenticated && user.rol === 'admin';
 
-  const loadRequests = async () => {
-    if (!isAdmin) return;
+  const loadRequests = useCallback(async () => {
     setIsLoadingRequests(true);
-    const data = await fetchAdminSubscriptionRequests();
-    setSubscriptionRequests(data);
-    setIsLoadingRequests(false);
-  };
+    try {
+      const data = await fetchAdminSubscriptionRequests();
+      setSubscriptionRequests(data);
+    } catch {
+      toast.error('No se pudieron cargar las solicitudes de suscripción');
+    } finally {
+      setIsLoadingRequests(false);
+    }
+  }, [fetchAdminSubscriptionRequests]);
 
   useEffect(() => {
     if (isAdmin) {
       loadRequests();
     }
-  }, [isAdmin]);
+  }, [isAdmin, loadRequests]);
 
   // Access denied screen for non-admin users
   if (!isAdmin) {
@@ -168,16 +179,20 @@ const AdminScreen: React.FC = () => {
   }
 
   const handleApprove = async (req: SubscriptionRequest) => {
+    setProcessingId(req.id);
     const ok = await approveSubscriptionRequest(req.id, req.userId, req.plan, req.price);
+    setProcessingId(null);
     if (ok) {
       loadRequests();
     }
   };
 
   const handleReject = async (req: SubscriptionRequest) => {
-    const reason = window.prompt('Motivo del rechazo (opcional):', 'Comprobante no coincide con abono en Yape');
+    const reason = window.prompt('Motivo del rechazo (opcional):', 'Comprobante o número de operación no verificado en Yape');
     if (reason !== null) {
+      setProcessingId(req.id);
       const ok = await rejectSubscriptionRequest(req.id, reason);
+      setProcessingId(null);
       if (ok) {
         loadRequests();
       }
@@ -308,7 +323,7 @@ const AdminScreen: React.FC = () => {
     <div className="flex flex-col gap-4">
       <AppHeader
         title="Panel de Administración"
-        subtitle="Gestión de suscripciones Yape y base de datos"
+        subtitle="Gestión de solicitudes Yape y base de datos"
         iconEmoji="🛡️"
         showBack={true}
         bgGradient="from-[#183153] to-[#254A7A]"
@@ -319,9 +334,9 @@ const AdminScreen: React.FC = () => {
               loadRequests();
             }}
             className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white active:scale-90"
-            title="Refrescar base de datos"
+            title="Refrescar solicitudes y datos"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingRequests ? 'animate-spin' : ''}`} />
           </button>
         }
       />
@@ -337,7 +352,7 @@ const AdminScreen: React.FC = () => {
           >
             <span>Yape</span>
             {pendingRequests.length > 0 && (
-              <span className="w-4 h-4 rounded-full bg-[#F05C54] text-white text-[9px] flex items-center justify-center">
+              <span className="px-1.5 py-0.2 rounded-full bg-[#F05C54] text-white text-[9px] font-black">
                 {pendingRequests.length}
               </span>
             )}
@@ -382,89 +397,139 @@ const AdminScreen: React.FC = () => {
         {/* Yape Subscriptions Tab */}
         {activeTab === 'suscripciones' && (
           <div className="flex flex-col gap-3">
-            <h3 className="text-xs font-black text-[#183153] uppercase tracking-wide flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-[#FF9418]" />
-              <span>Solicitudes Pendientes ({pendingRequests.length})</span>
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-[#183153] uppercase tracking-wide flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-[#FF9418]" />
+                <span>Solicitudes Pendientes ({pendingRequests.length})</span>
+              </h3>
+              <button
+                onClick={loadRequests}
+                className="text-[11px] font-bold text-[#12B7E8] hover:underline flex items-center gap-1"
+              >
+                <RefreshCw className={`w-3 h-3 ${isLoadingRequests ? 'animate-spin' : ''}`} />
+                <span>Actualizar</span>
+              </button>
+            </div>
 
             {isLoadingRequests ? (
-              <div className="p-6 text-center text-xs font-bold text-slate-400">Cargando solicitudes...</div>
+              <div className="p-8 text-center text-xs font-bold text-slate-400 bg-white rounded-2xl border border-slate-100 flex flex-col items-center justify-center gap-2">
+                <RefreshCw className="w-5 h-5 animate-spin text-[#F05C54]" />
+                <span>Cargando solicitudes de Supabase...</span>
+              </div>
             ) : pendingRequests.length === 0 ? (
               <div className="p-6 text-center bg-white rounded-2xl border border-slate-100">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-1.5" />
                 <p className="text-xs font-black text-[#183153]">No hay pagos Yape pendientes</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Las nuevas solicitudes aparecerán aquí en tiempo real.</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Las solicitudes de suscripción aparecerán aquí en tiempo real.</p>
               </div>
             ) : (
               pendingRequests.map(req => (
-                <div key={req.id} className="bg-white rounded-2xl p-4 shadow-sm border border-amber-200 flex flex-col gap-2.5">
+                <div key={req.id} className="bg-white rounded-2xl p-4 shadow-sm border border-amber-200 flex flex-col gap-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 uppercase">
-                        Plan {req.plan} • S/ {req.price}
+                      <span className="text-[10px] font-black px-2.5 py-0.5 rounded-md bg-purple-100 text-purple-800 uppercase tracking-wider">
+                        PLAN {req.plan} • S/ {req.price}.00
                       </span>
-                      <h4 className="text-xs font-black text-[#183153] mt-1">
-                        {req.userName || `Usuario: ${req.userId.slice(0, 8)}`}
+                      <h4 className="text-sm font-black text-[#183153] mt-1.5 flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{req.userName || 'Estudiante'}</span>
                       </h4>
-                      <span className="text-[10px] text-slate-400 block">
-                        Fecha: {new Date(req.createdAt).toLocaleString('es-PE')}
-                      </span>
                     </div>
 
-                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full uppercase">
                       Pendiente
                     </span>
                   </div>
 
-                  <div className="bg-slate-50 p-2.5 rounded-xl text-[11px] text-slate-700 space-y-1">
-                    <div>• <strong>N° Operación:</strong> {req.operationNumber || 'No especificado'}</div>
-                    <div>• <strong>Teléfono Yape:</strong> {req.phoneNumber || 'No especificado'}</div>
+                  {/* Detalle completo de la solicitud */}
+                  <div className="bg-slate-50 p-3 rounded-xl text-xs text-slate-700 space-y-1.5 border border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <Hash className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span><strong>N° Operación:</strong> <span className="font-mono text-slate-900 font-bold">{req.operationNumber || 'No especificado'}</span></span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span><strong>Teléfono Yape:</strong> <span className="font-mono text-slate-900 font-bold">{req.phoneNumber || 'No especificado'}</span></span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span><strong>Monto:</strong> S/ {req.price}.00</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="text-[11px] text-slate-500"><strong>Fecha:</strong> {new Date(req.createdAt).toLocaleString('es-PE')}</span>
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 font-mono pt-0.5">
+                      ID Usuario: {req.userId}
+                    </div>
                   </div>
 
-                  {req.paymentProofUrl && (
+                  {/* Enlace o miniatura al comprobante */}
+                  {req.paymentProofUrl ? (
                     <a
                       href={req.paymentProofUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs font-bold text-[#7354D9] hover:underline bg-purple-50 p-2 rounded-xl"
+                      className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-[#7354D9] bg-purple-50 hover:bg-purple-100 p-2.5 rounded-xl border border-purple-200 transition-colors"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ImageIcon className="w-4 h-4 text-[#7354D9]" />
                       <span>Ver imagen del comprobante</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
                     </a>
+                  ) : (
+                    <div className="text-[11px] text-slate-400 italic text-center">
+                      (No se adjuntó archivo de comprobante)
+                    </div>
                   )}
 
-                  <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                  {/* Botones de acción Aprobar / Rechazar */}
+                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                     <button
                       onClick={() => handleApprove(req)}
-                      className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-sm flex items-center justify-center gap-1"
+                      disabled={processingId === req.id}
+                      className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs shadow-sm flex items-center justify-center gap-1.5 transition-transform active:scale-95"
                     >
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                      <span>Aprobar y Activar</span>
+                      <Check className="w-4 h-4 stroke-[3]" />
+                      <span>{processingId === req.id ? 'Aprobando...' : `Aprobar ${req.plan}`}</span>
                     </button>
 
                     <button
                       onClick={() => handleReject(req)}
-                      className="py-2.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-black text-xs border border-rose-200"
+                      disabled={processingId === req.id}
+                      className="py-3 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 disabled:opacity-50 text-rose-600 font-black text-xs border border-rose-200 transition-colors flex items-center gap-1"
                     >
-                      Rechazar
+                      <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Rechazar</span>
                     </button>
                   </div>
                 </div>
               ))
             )}
 
-            {/* Past reviewed requests */}
+            {/* Historial de solicitudes revisadas */}
             {pastRequests.length > 0 && (
               <div className="mt-4 flex flex-col gap-2">
                 <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-wide">
-                  Historial de Solicitudes Revisadas ({pastRequests.length})
+                  Historial de Solicitudes Procesadas ({pastRequests.length})
                 </h4>
-                {pastRequests.slice(0, 5).map(req => (
+                {pastRequests.map(req => (
                   <div key={req.id} className="p-3 bg-white rounded-xl border border-slate-100 flex items-center justify-between text-xs">
                     <div>
-                      <span className="font-bold text-[#183153]">Plan {req.plan}</span>
-                      <span className="text-[10px] text-slate-400 block">{req.userName || req.userId.slice(0, 8)}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-black text-[#183153]">Plan {req.plan}</span>
+                        <span className="text-slate-400">•</span>
+                        <span className="text-slate-600 font-medium">{req.userName || req.userId.slice(0, 8)}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">
+                        {new Date(req.createdAt).toLocaleDateString('es-PE')}
+                        {req.rejectionReason && ` • Motivo: ${req.rejectionReason}`}
+                      </span>
                     </div>
+
                     <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
                       req.status === 'aprobada' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                     }`}>
