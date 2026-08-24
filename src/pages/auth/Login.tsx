@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useChuplingo } from '../../context/ChuplingoContext';
 import { ChuplingoMascot } from '../../components/mascot/ChuplingoMascot';
-import { Eye, EyeOff, Lock, Mail, ArrowRight, Shield } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Login: React.FC = () => {
@@ -118,17 +118,6 @@ const Login: React.FC = () => {
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
-
-        {/* Admin or Quick Demo Access Info */}
-        <div className="mt-4 p-3 rounded-2xl bg-amber-50 border border-amber-200/80 text-[11px] text-amber-900">
-          <div className="flex items-center gap-1.5 font-black mb-1">
-            <Shield className="w-3.5 h-3.5 text-amber-700" />
-            <span>Acceso rápido de prueba / Administrador:</span>
-          </div>
-          <p className="text-[10px] text-amber-800">
-            Admin: <code>admin@chuplingo.pe</code>
-          </p>
-        </div>
 
         <div className="mt-6 text-center">
           <p className="text-xs text-slate-500 font-medium">

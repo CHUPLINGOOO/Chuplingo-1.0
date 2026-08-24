@@ -12,7 +12,8 @@ import {
   Challenge,
   NotificationItem,
   PlanId,
-  SubscriptionRequest
+  SubscriptionRequest,
+  UserRole
 } from '../types/chuplingo';
 import { COURSES, LEVEL_THRESHOLDS } from '../data/coursesData';
 import { INITIAL_CHALLENGES } from '../data/challengesData';
@@ -500,7 +501,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       if (profile) {
         const { level, title } = calculateLevelInfo(profile.xp || 0);
-        const isAdmin = profile.role === 'admin' || user.email === 'admin@chuplingo.pe';
+        const assignedRole: UserRole = profile.role === 'admin' ? 'admin' : 'student';
 
         setUser(prev => ({
           ...prev,
@@ -512,7 +513,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           tituloNivel: title,
           rachaActual: profile.current_streak || 0,
           mejorRacha: profile.best_streak || 0,
-          rol: (isAdmin ? 'admin' : (profile.role as any) || 'student'),
+          rol: assignedRole,
           preferencias: {
             ...prev.preferencias,
             metaDiaria: profile.daily_goal || prev.preferencias.metaDiaria
@@ -625,7 +626,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (session?.user) {
           setIsAuthenticated(true);
           const meta = session.user.user_metadata || {};
-          const isUserAdmin = session.user.email === 'admin@chuplingo.pe';
 
           setUser(prev => ({
             ...prev,
@@ -634,7 +634,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             emailVerificado: !!session.user.email_confirmed_at,
             nombre: meta.first_name || meta.nombre || prev.nombre || 'Estudiante',
             apellido: meta.last_name || meta.apellido || prev.apellido || 'Chuplingo',
-            rol: isUserAdmin ? 'admin' : (prev.rol || 'student'),
             onboardingCompletado: true
           }));
 
@@ -651,7 +650,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (session?.user) {
         setIsAuthenticated(true);
         const meta = session.user.user_metadata || {};
-        const isUserAdmin = session.user.email === 'admin@chuplingo.pe';
 
         setUser(prev => ({
           ...prev,
@@ -660,7 +658,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           emailVerificado: !!session.user.email_confirmed_at,
           nombre: meta.first_name || meta.nombre || prev.nombre || 'Estudiante',
           apellido: meta.last_name || meta.apellido || prev.apellido || 'Chuplingo',
-          rol: isUserAdmin ? 'admin' : (prev.rol || 'student'),
           onboardingCompletado: true
         }));
 
@@ -790,7 +787,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       const meta = authData.user?.user_metadata || {};
-      const isUserAdmin = emailNorm === 'admin@chuplingo.pe';
 
       setUser(prev => ({
         ...prev,
@@ -799,7 +795,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         emailVerificado: !!authData.user.email_confirmed_at,
         nombre: meta.first_name || meta.nombre || prev.nombre || 'Estudiante',
         apellido: meta.last_name || meta.apellido || prev.apellido || 'Chuplingo',
-        rol: isUserAdmin ? 'admin' : prev.rol,
         onboardingCompletado: true
       }));
 
@@ -1044,6 +1039,10 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Admin: Fetch all subscription requests
   const fetchAdminSubscriptionRequests = async (): Promise<SubscriptionRequest[]> => {
+    if (user.rol !== 'admin') {
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from('subscription_requests')
@@ -1080,6 +1079,11 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Admin: Approve Request
   const approveSubscriptionRequest = async (requestId: string, targetUserId: string, plan: string, price: number): Promise<boolean> => {
+    if (user.rol !== 'admin') {
+      toast.error('Operación no autorizada: requiere privilegios de administrador');
+      return false;
+    }
+
     try {
       const nextMonth = new Date();
       nextMonth.setMonth(nextMonth.getMonth() + 1);
@@ -1141,6 +1145,11 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Admin: Reject Request
   const rejectSubscriptionRequest = async (requestId: string, reason?: string): Promise<boolean> => {
+    if (user.rol !== 'admin') {
+      toast.error('Operación no autorizada: requiere privilegios de administrador');
+      return false;
+    }
+
     try {
       const { error } = await supabase
         .from('subscription_requests')
@@ -1480,6 +1489,11 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const addQuestionToBank = async (newQ: Omit<Question, 'id'>): Promise<Question | null> => {
+    if (user.rol !== 'admin') {
+      toast.error('Operación no autorizada: requiere privilegios de administrador');
+      return null;
+    }
+
     try {
       const payload = {
         course_id: newQ.courseId,
@@ -1524,6 +1538,11 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const deleteQuestionFromBank = async (id: string): Promise<boolean> => {
+    if (user.rol !== 'admin') {
+      toast.error('Operación no autorizada: requiere privilegios de administrador');
+      return false;
+    }
+
     try {
       const { error } = await supabase.from('questions').delete().eq('id', id);
       if (error) {
@@ -1539,6 +1558,11 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const importQuestionsBatch = async (batchQuestions: any[]): Promise<number> => {
+    if (user.rol !== 'admin') {
+      toast.error('Operación no autorizada: requiere privilegios de administrador');
+      return 0;
+    }
+
     try {
       if (!Array.isArray(batchQuestions) || batchQuestions.length === 0) {
         toast.error('El lote no contiene registros válidos');
