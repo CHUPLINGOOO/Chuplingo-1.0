@@ -805,7 +805,7 @@ const AdminScreen: React.FC = () => {
                   className="w-full bg-slate-50 border rounded-xl p-2 text-xs font-bold"
                 >
                   {COURSES.map(c => (
-                    <option key={c.id} value={c.id}>{c.nombre}
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
                   ))}
                 </select>
               </div>
