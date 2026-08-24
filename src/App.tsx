@@ -25,6 +25,7 @@ import PlansScreen from "./pages/PlansScreen";
 import NotificationsCenter from "./pages/NotificationsCenter";
 import EmailTemplatesPreview from "./pages/EmailTemplatesPreview";
 import AdminScreen from "./pages/AdminScreen";
+import DownloadApp from "./pages/DownloadApp";
 
 // Auth Pages
 import Register from "./pages/auth/Register";
@@ -38,7 +39,7 @@ const queryClient = new QueryClient();
 const AppContent = () => {
   const location = useLocation();
 
-  // Hide bottom nav on onboarding, authentication, active question screen and admin views
+  // Hide bottom nav on onboarding, authentication, active question screen, admin and download views
   const hideBottomNavRoutes = [
     '/welcome',
     '/register',
@@ -46,7 +47,9 @@ const AppContent = () => {
     '/verify-email',
     '/forgot-password',
     '/practice',
-    '/admin'
+    '/admin',
+    '/descargar',
+    '/download'
   ];
   
   const shouldHideBottomNav = hideBottomNavRoutes.some(path => location.pathname.startsWith(path));
@@ -77,6 +80,8 @@ const AppContent = () => {
         <Route path="/notifications" element={<NotificationsCenter />} />
         <Route path="/email-templates" element={<EmailTemplatesPreview />} />
         <Route path="/admin" element={<AdminScreen />} />
+        <Route path="/descargar" element={<DownloadApp />} />
+        <Route path="/download" element={<DownloadApp />} />
         <Route path="/profile" element={<ProfileScreen />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

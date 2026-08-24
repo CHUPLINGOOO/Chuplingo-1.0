@@ -17,7 +17,7 @@ import {
   CreditCard,
   Download,
   LogOut,
-  Mail
+  Smartphone
 } from 'lucide-react';
 import { LEVEL_THRESHOLDS } from '../data/coursesData';
 import { toast } from 'sonner';
@@ -206,6 +206,26 @@ const ProfileScreen: React.FC = () => {
             <span className="text-xs font-black text-[#183153] block">{totalQuestions}</span>
             <span className="text-[9px] text-slate-400 font-bold uppercase">Preguntas</span>
           </div>
+        </div>
+      </div>
+
+      {/* Download App Link */}
+      <div className="px-4">
+        <div 
+          onClick={() => navigate('/descargar')}
+          className="bg-gradient-to-r from-[#183153] to-[#254A7A] text-white rounded-2xl p-4 shadow-sm flex items-center justify-between cursor-pointer hover:shadow-md transition-all"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-amber-300">
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-black tracking-wider text-amber-300 block">App Android</span>
+              <h4 className="text-sm font-black">Descargar APK Chuplingo</h4>
+              <p className="text-[11px] text-slate-200">Instala la app oficial con QR y enlace directo</p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-white/80" />
         </div>
       </div>
 
