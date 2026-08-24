@@ -31,273 +31,21 @@ import { toast } from 'sonner';
 
 function parseCSVToQuestions(csvText: string): any[] {
   const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
+
   if (lines.length < 2) return [];
 
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, '').replace(/^\uFEFF/, ''));
+  const headers = lines[0].split(',').map(h => h.trim());
   const rows: any[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const values: string[] = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (const char of lines[i]) {
-      if (char === '"' || char === "'") {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        values.push(current.trim().replace(/^["']|["']$/g, ''));
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    values.push(current.trim().replace(/^["']|["']$/g, ''));
+    const values = lines[i].split(',').map(v => v.trim());
 
     const obj: any = {};
-    headers.forEach((h, idx) => {
-      obj[h] = values[idx] || '';
+    headers.forEach((h, index) => {
+      obj[h] = values[index] || '';
     });
 
-    if (obj.course || obj.course_id || obj.question || obj.pregunta) {
-      rows.push(obj);
-    }
-  }
-
-  return rows;
-}
-
-const COURSE_NAME_MAP: Record<string, CourseId> = {
-  'literatura': 'literatura',
-  'psicología': 'psicologia',
-  'psicologia': 'psicologia',
-  'geografía': 'geografia',
-  'geografia': 'geografia',
-  'razonamiento verbal': 'razonamiento-verbal',
-  'razonamiento-verbal': 'razonamiento-verbal',
-  'cívica': 'civica',
-  'civica': 'civica',
-  'filosofía': 'filosofia',
-  'filosofia': 'filosofia',
-  'inglés': 'ingles',
-  'ingles': 'ingles',
-  'biología': 'biologia',
-  'biologia': 'biologia'
-};
-
-const AdminScreen: React.FC = () => {
-  const navigate = useNavigate();
-  const { 
-    user, 
-    isAuthenticated,
-    allQuestions, 
-    addQuestionToBank, 
-    deleteQuestionFromBank, 
-    importQuestionsBatch, 
-    fetchQuestionsFromSupabase,
-    fetchAdminSubscriptionRequests,
-    approveSubscriptionRequest,
-    rejectSubscriptionRequest,
-    getProofFileUrl,
-    getOverallStats 
-  } = useChuplingo();
-
-  const [activeTab, setActiveTab] = useState<'suscripciones' | 'preguntas' | 'crear' | 'importar' | 'metricas'>('suscripciones');
-  const [filterCourse, setFilterCourse] = useState<CourseId | 'all'>('all');
-  const [subscriptionRequests, setSubscriptionRequests] = useState<SubscriptionRequest[]>([]);
-  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-
-  // Modal para ver imagen del comprobante
-  const [previewProofUrl, setPreviewProofUrl] = useState<string | null>(null);
-  const [isLoadingProofImage, setIsLoadingProofImage] = useState(false);
-
-  // Modal de rechazo
-  const [rejectingReq, setRejectingReq] = useState<SubscriptionRequest | null>(null);
-  const [rejectReason, setRejectReason] = useState('Comprobante o número de operación no verificado en Yape');
-
-  // Single Question Form
-  const [courseId, setCourseId] = useState<CourseId>('literatura');
-  const [topicId, setTopicId] = useState('lit-1');
-  const [dificultad, setDificultad] = useState<QuestionDifficulty>('intermedio');
-  const [pregunta, setPregunta] = useState('');
-  const [optA, setOptA] = useState('');
-  const [optB, setOptB] = useState('');
-  const [optC, setOptC] = useState('');
-  const [optD, setOptD] = useState('');
-  const [optE, setOptE] = useState('');
-  const [correctAnswer, setCorrectAnswer] = useState<'A' | 'B' | 'C' | 'D' | 'E'>('A');
-  const [explicacion, setExplicacion] = useState('');
-  const [fuente, setFuente] = useState('');
-
-  // Bulk Importer State
-  const [batchFormat, setBatchFormat] = useState<'json' | 'csv'>('csv');
-  const [batchRawText, setBatchRawText] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-
-  const stats = getOverallStats();
-  const isAdmin = isAuthenticated && user.rol === 'admin';
-
-  const loadRequests = useCallback(async () => {
-    setIsLoadingRequests(true);
-    try {
-      const data = await fetchAdminSubscriptionRequests();
-      setSubscriptionRequests(data);
-    } catch {
-      toast.error('No se pudieron cargar las solicitudes de suscripción');
-    } finally {
-      setIsLoadingRequests(false);
-    }
-  }, [fetchAdminSubscriptionRequests]);
-
-  useEffect(() => {
-    if (isAdmin) {
-      loadRequests();
-    }
-  }, [isAdmin, loadRequests]);
-
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-[#F7F8FC] flex flex-col justify-between p-5 text-center select-none">
-        <div className="max-w-sm mx-auto w-full pt-12 flex flex-col items-center">
-          <div className="w-16 h-16 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 shadow-sm border border-rose-100">
-            <Lock className="w-8 h-8" />
-          </div>
-
-          <h1 className="text-xl font-black text-[#183153]">
-            Acceso Restringido
-          </h1>
-
-          <p className="text-xs text-slate-500 mt-2 max-w-xs leading-relaxed font-medium">
-            Esta sección está reservada exclusivamente para cuentas con rol de administrador (<code>role = &apos;admin&apos;</code>).
-          </p>
-
-          <button
-            onClick={() => navigate('/')}
-            className="mt-6 w-full py-3.5 px-6 rounded-2xl bg-[#183153] hover:bg-[#10223A] text-white font-black text-xs shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Volver a la aplicación</span>
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const handleApprove = async (req: SubscriptionRequest) => {
-    setProcessingId(req.id);
-    const ok = await approveSubscriptionRequest(req.id, req.userId, req.plan, req.price);
-    setProcessingId(null);
-    if (ok) {
-      setSubscriptionRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'aprobada' } : r));
-      await loadRequests();
-    }
-  };
-
-  const handleOpenRejectModal = (req: SubscriptionRequest) => {
-    setRejectingReq(req);
-    setRejectReason('Comprobante o número de operación no verificado en Yape');
-  };
-
-  const handleConfirmReject = async () => {
-    if (!rejectingReq) return;
-    
-    setProcessingId(rejectingReq.id);
-    const targetId = rejectingReq.id;
-    const currentReason = rejectReason.trim() || 'Pago no verificado en Yape';
-    
-    const ok = await rejectSubscriptionRequest(targetId, currentReason);
-    setProcessingId(null);
-    
-    if (ok) {
-      setRejectingReq(null);
-      setSubscriptionRequests(prev => prev.map(r => r.id === targetId ? { ...r, status: 'rechazada', rejectionReason: currentReason } : r));
-      await loadRequests();
-    }
-  };
-
-  const handleViewProof = async (proofPath: string) => {
-    setIsLoadingProofImage(true);
-    try {
-      const resolvedUrl = await getProofFileUrl(proofPath);
-      setPreviewProofUrl(resolvedUrl);
-    } catch {
-      toast.error('No se pudo cargar la imagen del comprobante');
-    } finally {
-      setIsLoadingProofImage(false);
-    }
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if<dyad-write path="src/pages/AdminScreen.tsx" description="Actualizar AdminScreen con modal interactivo de rechazo, visualización de errores y recarga reactiva de solicitudes">
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AppHeader } from '../components/layout/AppHeader';
-import { useChuplingo } from '../context/ChuplingoContext';
-import { COURSES } from '../data/coursesData';
-import { CourseId, QuestionDifficulty, SubscriptionRequest } from '../types/chuplingo';
-import { 
-  Shield, 
-  Trash2, 
-  FileSpreadsheet, 
-  RefreshCw, 
-  FileUp, 
-  Clock, 
-  X, 
-  ExternalLink, 
-  CheckCircle2, 
-  Lock, 
-  ArrowLeft, 
-  User, 
-  Phone, 
-  Hash, 
-  DollarSign, 
-  Calendar, 
-  Image as ImageIcon, 
-  Eye, 
-  Check, 
-  Upload,
-  AlertTriangle
-} from 'lucide-react';
-import { toast } from 'sonner';
-
-function parseCSVToQuestions(csvText: string): any[] {
-  const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
-  if (lines.length < 2) return [];
-
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, '').replace(/^\uFEFF/, ''));
-  const rows: any[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const values: string[] = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (const char of lines[i]) {
-      if (char === '"' || char === "'") {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        values.push(current.trim().replace(/^["']|["']$/g, ''));
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    values.push(current.trim().replace(/^["']|["']$/g, ''));
-
-    const obj: any = {};
-    headers.forEach((h, idx) => {
-      obj[h] = values[idx] || '';
-    });
-
-    if (obj.course || obj.course_id || obj.question || obj.pregunta) {
-      rows.push(obj);
-    }
+    rows.push(obj);
   }
 
   return rows;
@@ -1057,7 +805,7 @@ const AdminScreen: React.FC = () => {
                   className="w-full bg-slate-50 border rounded-xl p-2 text-xs font-bold"
                 >
                   {COURSES.map(c => (
-                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                    <option key={c.id} value={c.id}>{c.nombre}
                   ))}
                 </select>
               </div>
