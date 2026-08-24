@@ -24,7 +24,8 @@ import {
   Image as ImageIcon, 
   Eye, 
   Check, 
-  Upload 
+  Upload,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -110,6 +111,10 @@ const AdminScreen: React.FC = () => {
   const [previewProofUrl, setPreviewProofUrl] = useState<string | null>(null);
   const [isLoadingProofImage, setIsLoadingProofImage] = useState(false);
 
+  // Modal de rechazo
+  const [rejectingReq, setRejectingReq] = useState<SubscriptionRequest | null>(null);
+  const [rejectReason, setRejectReason] = useState('Comprobante o número de operación no verificado en Yape');
+
   // Single Question Form
   const [courseId, setCourseId] = useState<CourseId>('literatura');
   const [topicId, setTopicId] = useState('lit-1');
@@ -183,19 +188,267 @@ const AdminScreen: React.FC = () => {
     const ok = await approveSubscriptionRequest(req.id, req.userId, req.plan, req.price);
     setProcessingId(null);
     if (ok) {
+      setSubscriptionRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'aprobada' } : r));
       await loadRequests();
     }
   };
 
-  const handleReject = async (req: SubscriptionRequest) => {
-    const reason = window.prompt('Motivo del rechazo (opcional):', 'Comprobante o número de operación no verificado en Yape');
-    if (reason !== null) {
-      setProcessingId(req.id);
-      const ok = await rejectSubscriptionRequest(req.id, reason);
-      setProcessingId(null);
-      if (ok) {
-        await loadRequests();
+  const handleOpenRejectModal = (req: SubscriptionRequest) => {
+    setRejectingReq(req);
+    setRejectReason('Comprobante o número de operación no verificado en Yape');
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectingReq) return;
+    
+    setProcessingId(rejectingReq.id);
+    const targetId = rejectingReq.id;
+    const currentReason = rejectReason.trim() || 'Pago no verificado en Yape';
+    
+    const ok = await rejectSubscriptionRequest(targetId, currentReason);
+    setProcessingId(null);
+    
+    if (ok) {
+      setRejectingReq(null);
+      setSubscriptionRequests(prev => prev.map(r => r.id === targetId ? { ...r, status: 'rechazada', rejectionReason: currentReason } : r));
+      await loadRequests();
+    }
+  };
+
+  const handleViewProof = async (proofPath: string) => {
+    setIsLoadingProofImage(true);
+    try {
+      const resolvedUrl = await getProofFileUrl(proofPath);
+      setPreviewProofUrl(resolvedUrl);
+    } catch {
+      toast.error('No se pudo cargar la imagen del comprobante');
+    } finally {
+      setIsLoadingProofImage(false);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if<dyad-write path="src/pages/AdminScreen.tsx" description="Actualizar AdminScreen con modal interactivo de rechazo, visualización de errores y recarga reactiva de solicitudes">
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AppHeader } from '../components/layout/AppHeader';
+import { useChuplingo } from '../context/ChuplingoContext';
+import { COURSES } from '../data/coursesData';
+import { CourseId, QuestionDifficulty, SubscriptionRequest } from '../types/chuplingo';
+import { 
+  Shield, 
+  Trash2, 
+  FileSpreadsheet, 
+  RefreshCw, 
+  FileUp, 
+  Clock, 
+  X, 
+  ExternalLink, 
+  CheckCircle2, 
+  Lock, 
+  ArrowLeft, 
+  User, 
+  Phone, 
+  Hash, 
+  DollarSign, 
+  Calendar, 
+  Image as ImageIcon, 
+  Eye, 
+  Check, 
+  Upload,
+  AlertTriangle
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+function parseCSVToQuestions(csvText: string): any[] {
+  const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, '').replace(/^\uFEFF/, ''));
+  const rows: any[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const values: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (const char of lines[i]) {
+      if (char === '"' || char === "'") {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim().replace(/^["']|["']$/g, ''));
+        current = '';
+      } else {
+        current += char;
       }
+    }
+    values.push(current.trim().replace(/^["']|["']$/g, ''));
+
+    const obj: any = {};
+    headers.forEach((h, idx) => {
+      obj[h] = values[idx] || '';
+    });
+
+    if (obj.course || obj.course_id || obj.question || obj.pregunta) {
+      rows.push(obj);
+    }
+  }
+
+  return rows;
+}
+
+const COURSE_NAME_MAP: Record<string, CourseId> = {
+  'literatura': 'literatura',
+  'psicología': 'psicologia',
+  'psicologia': 'psicologia',
+  'geografía': 'geografia',
+  'geografia': 'geografia',
+  'razonamiento verbal': 'razonamiento-verbal',
+  'razonamiento-verbal': 'razonamiento-verbal',
+  'cívica': 'civica',
+  'civica': 'civica',
+  'filosofía': 'filosofia',
+  'filosofia': 'filosofia',
+  'inglés': 'ingles',
+  'ingles': 'ingles',
+  'biología': 'biologia',
+  'biologia': 'biologia'
+};
+
+const AdminScreen: React.FC = () => {
+  const navigate = useNavigate();
+  const { 
+    user, 
+    isAuthenticated,
+    allQuestions, 
+    addQuestionToBank, 
+    deleteQuestionFromBank, 
+    importQuestionsBatch, 
+    fetchQuestionsFromSupabase,
+    fetchAdminSubscriptionRequests,
+    approveSubscriptionRequest,
+    rejectSubscriptionRequest,
+    getProofFileUrl,
+    getOverallStats 
+  } = useChuplingo();
+
+  const [activeTab, setActiveTab] = useState<'suscripciones' | 'preguntas' | 'crear' | 'importar' | 'metricas'>('suscripciones');
+  const [filterCourse, setFilterCourse] = useState<CourseId | 'all'>('all');
+  const [subscriptionRequests, setSubscriptionRequests] = useState<SubscriptionRequest[]>([]);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
+  // Modal para ver imagen del comprobante
+  const [previewProofUrl, setPreviewProofUrl] = useState<string | null>(null);
+  const [isLoadingProofImage, setIsLoadingProofImage] = useState(false);
+
+  // Modal de rechazo
+  const [rejectingReq, setRejectingReq] = useState<SubscriptionRequest | null>(null);
+  const [rejectReason, setRejectReason] = useState('Comprobante o número de operación no verificado en Yape');
+
+  // Single Question Form
+  const [courseId, setCourseId] = useState<CourseId>('literatura');
+  const [topicId, setTopicId] = useState('lit-1');
+  const [dificultad, setDificultad] = useState<QuestionDifficulty>('intermedio');
+  const [pregunta, setPregunta] = useState('');
+  const [optA, setOptA] = useState('');
+  const [optB, setOptB] = useState('');
+  const [optC, setOptC] = useState('');
+  const [optD, setOptD] = useState('');
+  const [optE, setOptE] = useState('');
+  const [correctAnswer, setCorrectAnswer] = useState<'A' | 'B' | 'C' | 'D' | 'E'>('A');
+  const [explicacion, setExplicacion] = useState('');
+  const [fuente, setFuente] = useState('');
+
+  // Bulk Importer State
+  const [batchFormat, setBatchFormat] = useState<'json' | 'csv'>('csv');
+  const [batchRawText, setBatchRawText] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+
+  const stats = getOverallStats();
+  const isAdmin = isAuthenticated && user.rol === 'admin';
+
+  const loadRequests = useCallback(async () => {
+    setIsLoadingRequests(true);
+    try {
+      const data = await fetchAdminSubscriptionRequests();
+      setSubscriptionRequests(data);
+    } catch {
+      toast.error('No se pudieron cargar las solicitudes de suscripción');
+    } finally {
+      setIsLoadingRequests(false);
+    }
+  }, [fetchAdminSubscriptionRequests]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadRequests();
+    }
+  }, [isAdmin, loadRequests]);
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-[#F7F8FC] flex flex-col justify-between p-5 text-center select-none">
+        <div className="max-w-sm mx-auto w-full pt-12 flex flex-col items-center">
+          <div className="w-16 h-16 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 shadow-sm border border-rose-100">
+            <Lock className="w-8 h-8" />
+          </div>
+
+          <h1 className="text-xl font-black text-[#183153]">
+            Acceso Restringido
+          </h1>
+
+          <p className="text-xs text-slate-500 mt-2 max-w-xs leading-relaxed font-medium">
+            Esta sección está reservada exclusivamente para cuentas con rol de administrador (<code>role = &apos;admin&apos;</code>).
+          </p>
+
+          <button
+            onClick={() => navigate('/')}
+            className="mt-6 w-full py-3.5 px-6 rounded-2xl bg-[#183153] hover:bg-[#10223A] text-white font-black text-xs shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Volver a la aplicación</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleApprove = async (req: SubscriptionRequest) => {
+    setProcessingId(req.id);
+    const ok = await approveSubscriptionRequest(req.id, req.userId, req.plan, req.price);
+    setProcessingId(null);
+    if (ok) {
+      setSubscriptionRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'aprobada' } : r));
+      await loadRequests();
+    }
+  };
+
+  const handleOpenRejectModal = (req: SubscriptionRequest) => {
+    setRejectingReq(req);
+    setRejectReason('Comprobante o número de operación no verificado en Yape');
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectingReq) return;
+    
+    setProcessingId(rejectingReq.id);
+    const targetId = rejectingReq.id;
+    const currentReason = rejectReason.trim() || 'Pago no verificado en Yape';
+    
+    const ok = await rejectSubscriptionRequest(targetId, currentReason);
+    setProcessingId(null);
+    
+    if (ok) {
+      setRejectingReq(null);
+      setSubscriptionRequests(prev => prev.map(r => r.id === targetId ? { ...r, status: 'rechazada', rejectionReason: currentReason } : r));
+      await loadRequests();
     }
   };
 
@@ -352,6 +605,69 @@ const AdminScreen: React.FC = () => {
           </button>
         }
       />
+
+      {/* Modal para ingresar motivo de rechazo */}
+      {rejectingReq && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl flex flex-col gap-3.5">
+            <div className="flex items-center justify-between border-b pb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-black text-[#183153]">Rechazar Solicitud</h3>
+              </div>
+              <button
+                onClick={() => setRejectingReq(null)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              ¿Confirmas el rechazo para la solicitud de <strong>{rejectingReq.userName || 'Usuario'}</strong> (Plan {rejectingReq.plan} - S/ {rejectingReq.price})?
+            </p>
+
+            <div>
+              <label className="text-[11px] font-black text-[#183153] uppercase tracking-wide block mb-1">
+                Motivo del rechazo
+              </label>
+              <textarea
+                rows={3}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Indica el motivo..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-400"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={() => setRejectingReq(null)}
+                disabled={processingId === rejectingReq.id}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmReject}
+                disabled={processingId === rejectingReq.id}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-black shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-1"
+              >
+                {processingId === rejectingReq.id ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Rechazando...</span>
+                  </>
+                ) : (
+                  <span>Confirmar Rechazo</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal para previsualizar comprobante */}
       {previewProofUrl && (
@@ -558,7 +874,7 @@ const AdminScreen: React.FC = () => {
                     </button>
 
                     <button
-                      onClick={() => handleReject(req)}
+                      onClick={() => handleOpenRejectModal(req)}
                       disabled={processingId === req.id}
                       className="py-3 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 disabled:opacity-50 text-rose-600 font-black text-xs border border-rose-200 transition-colors flex items-center gap-1"
                     >

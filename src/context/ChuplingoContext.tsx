@@ -112,7 +112,8 @@ const STORAGE_KEYS = {
   PENDING_REQUEST: 'chuplingo_pending_req_v2.0'
 };
 
-const isValidUUID = (id: string): boolean => {
+const isValidUUID = (id?: string | null): boolean => {
+  if (!id) return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 };
 
@@ -434,7 +435,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
 
     if (params.mode === 'simulacro') {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('questions')
         .select('*')
         .eq('active', true)
@@ -1023,7 +1024,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       toast.success(`🎉 Solicitud enviada para el Plan ${params.planId}. Revisaremos tu pago Yape en breve.`);
       return true;
-    } catch (err: any) {
+    } catch {
       toast.error('Error al procesar la solicitud de suscripción');
       return false;
     }
@@ -1064,6 +1065,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       if (error || !reqs) {
         console.error('[fetchAdminSubscriptionRequests error]', error);
+        toast.error(`Error al consultar solicitudes: ${error?.message || 'Permiso denegado'}`);
         return [];
       }
 
@@ -1109,8 +1111,9 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           userName: profile?.name || `Usuario (${item.user_id.slice(0, 8)})`
         };
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('[fetchAdminSubscriptionRequests exception]', err);
+      toast.error(`Error de red al cargar solicitudes: ${err?.message || ''}`);
       return [];
     }
   };
@@ -1120,18 +1123,24 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const nextMonth = new Date();
       nextMonth.setMonth(nextMonth.getMonth() + 1);
 
+      const { data: authData } = await supabase.auth.getUser();
+      const reviewerUuid = authData?.user?.id && isValidUUID(authData.user.id) 
+        ? authData.user.id 
+        : (isValidUUID(user.id) ? user.id : null);
+
       // 1. Update request status to 'approved'
       const { error: reqErr } = await supabase
         .from('subscription_requests')
         .update({
           status: 'approved',
           reviewed_at: new Date().toISOString(),
-          reviewed_by: user.id
+          reviewed_by: reviewerUuid
         })
         .eq('id', requestId);
 
       if (reqErr) {
-        toast.error(`Error al actualizar solicitud: ${reqErr.message}`);
+        console.error('[approveSubscriptionRequest error]', reqErr);
+        toast.error(`Error al aprobar solicitud: ${reqErr.message}`);
         return false;
       }
 
@@ -1167,28 +1176,41 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setUserPendingRequest(null);
       }
 
-      toast.success(`✓ Solicitud aprobada: Plan ${plan} activado para el usuario`);
+      toast.success(`✓ Solicitud aprobada: Plan ${plan} activado correctamente`);
       return true;
     } catch (err: any) {
-      toast.error('Error al aprobar suscripción');
+      console.error('[approveSubscriptionRequest exception]', err);
+      toast.error(`Error al aprobar suscripción: ${err?.message || 'Error desconocido'}`);
       return false;
     }
   };
 
   const rejectSubscriptionRequest = async (requestId: string, reason?: string): Promise<boolean> => {
     try {
-      const { error } = await supabase
+      const { data: authData } = await supabase.auth.getUser();
+      const reviewerUuid = authData?.user?.id && isValidUUID(authData.user.id) 
+        ? authData.user.id 
+        : (isValidUUID(user.id) ? user.id : null);
+
+      const { data, error } = await supabase
         .from('subscription_requests')
         .update({
           status: 'rejected',
-          rejection_reason: reason || 'Pago no verificado',
+          rejection_reason: reason || 'Comprobante o número de operación no verificado en Yape',
           reviewed_at: new Date().toISOString(),
-          reviewed_by: user.id
+          reviewed_by: reviewerUuid
         })
-        .eq('id', requestId);
+        .eq('id', requestId)
+        .select('*');
 
       if (error) {
-        toast.error(`Error: ${error.message}`);
+        console.error('[rejectSubscriptionRequest error]', error);
+        toast.error(`Error de Supabase al rechazar: ${error.message} (${error.code || ''})`);
+        return false;
+      }
+
+      if (!data || data.length === 0) {
+        toast.error('No se pudo actualizar la solicitud (verifica si tu usuario tiene permisos de administrador).');
         return false;
       }
 
@@ -1196,9 +1218,11 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setUserPendingRequest(null);
       }
 
-      toast.info('Solicitud rechazada correctamente');
+      toast.success('✓ Solicitud rechazada correctamente');
       return true;
-    } catch {
+    } catch (err: any) {
+      console.error('[rejectSubscriptionRequest exception]', err);
+      toast.error(`Error al procesar el rechazo: ${err?.message || 'Error de conexión'}`);
       return false;
     }
   };
@@ -1555,7 +1579,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setAllQuestions(prev => [mapped, ...prev]);
       toast.success('Pregunta guardada exitosamente en Supabase');
       return mapped;
-    } catch (err: any) {
+    } catch {
       toast.error('Error al guardar pregunta en la base de datos');
       return null;
     }
@@ -1632,7 +1656,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await fetchQuestionsFromSupabase();
       toast.success(`🎉 ¡Se importaron exitosamente ${data?.length || payloads.length} preguntas en Supabase!`);
       return data?.length || payloads.length;
-    } catch (err: any) {
+    } catch {
       toast.error('Ocurrió un error durante la importación en lote');
       return 0;
     }
