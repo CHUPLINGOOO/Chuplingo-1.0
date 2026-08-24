@@ -240,8 +240,8 @@ const PlansScreen: React.FC = () => {
               <span className="text-2xl font-black text-purple-900">S/ {selectedPlanForModal.precio}.00</span>
               <div className="bg-white p-2 rounded-xl border border-purple-100 mt-1">
                 <span className="text-[11px] font-bold text-slate-500 block">Número de Yape Chuplingo:</span>
-                <span className="text-base font-black text-[#183153]">987 654 321</span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">Titular: Chuplingo Educación SAC</span>
+                <span className="text-base font-black text-[#183153]">968 839 074</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">Titular: Rufo H.</span>
               </div>
             </div>
 
