@@ -14,6 +14,8 @@ export type QuestionDifficulty = 'basico' | 'intermedio' | 'avanzado';
 
 export type PlanId = 'gratis' | 'fan' | 'lover' | 'vip';
 
+export type UserRole = 'student' | 'admin';
+
 export interface Alternative {
   id: 'A' | 'B' | 'C' | 'D' | 'E';
   text: string;
@@ -133,8 +135,8 @@ export interface NotificationItem {
 }
 
 export interface UserPreferences {
-  metaDiaria: number; // 10, 20, 30, 50
-  horarioEstudio: string; // "19:00"
+  metaDiaria: number;
+  horarioEstudio: string;
   cursosFavoritos: CourseId[];
   sonido: boolean;
   vibracion: boolean;
@@ -159,6 +161,23 @@ export interface SubscriptionInfo {
   transaccionId?: string;
 }
 
+export interface SubscriptionRequest {
+  id: string;
+  userId: string;
+  plan: 'GRATIS' | 'FAN' | 'LOVER' | 'VIP';
+  price: number;
+  operationNumber?: string;
+  phoneNumber?: string;
+  paymentProofUrl?: string;
+  status: 'pendiente' | 'aprobada' | 'rechazada';
+  rejectionReason?: string;
+  createdAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  userEmail?: string;
+  userName?: string;
+}
+
 export interface UserProfile {
   id: string;
   nombre: string;
@@ -179,7 +198,7 @@ export interface UserProfile {
   metaDiariaCumplidaHoy: boolean;
   preferencias: UserPreferences;
   onboardingCompletado: boolean;
-  rol?: 'estudiante' | 'admin';
+  rol: UserRole;
 }
 
 export interface PlanConfig {

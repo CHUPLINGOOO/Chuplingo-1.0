@@ -11,7 +11,8 @@ import {
   Achievement,
   Challenge,
   NotificationItem,
-  PlanId
+  PlanId,
+  SubscriptionRequest
 } from '../types/chuplingo';
 import { COURSES, LEVEL_THRESHOLDS } from '../data/coursesData';
 import { INITIAL_CHALLENGES } from '../data/challengesData';
@@ -33,6 +34,7 @@ interface ChuplingoContextType {
   isLoadingQuestions: boolean;
   courseQuestionCounts: Record<string, number>;
   topicQuestionCounts: Record<string, number>;
+  userPendingRequest: SubscriptionRequest | null;
   fetchQuestionsForSession: (params: {
     courseId?: CourseId;
     topicId?: string;
@@ -60,6 +62,17 @@ interface ChuplingoContextType {
   updateUserPreferences: (prefs: Partial<UserProfile['preferencias']>) => void;
   updateUserName: (name: string, lastName?: string) => void;
   changeUserPlan: (planId: PlanId) => void;
+  // Subscription Requests System (Yape manual + Storage)
+  submitSubscriptionRequest: (params: {
+    planId: 'FAN' | 'LOVER' | 'VIP';
+    price: number;
+    operationNumber?: string;
+    phoneNumber?: string;
+    proofFile?: File | null;
+  }) => Promise<boolean>;
+  fetchAdminSubscriptionRequests: () => Promise<SubscriptionRequest[]>;
+  approveSubscriptionRequest: (requestId: string, targetUserId: string, plan: string, price: number) => Promise<boolean>;
+  rejectSubscriptionRequest: (requestId: string, reason?: string) => Promise<boolean>;
   claimChallengeReward: (challengeId: string) => void;
   resetAllProgress: () => void;
   completeOnboarding: (prefs?: { metaDiaria?: number; horarioEstudio?: string; cursosFavoritos?: CourseId[] }) => void;
@@ -93,7 +106,8 @@ const STORAGE_KEYS = {
   MISTAKES: 'chuplingo_mistakes_v2.0',
   ACHIEVEMENTS: 'chuplingo_achievements_v2.0',
   CLAIMED_CHALLENGES: 'chuplingo_claimed_challenges_v2.0',
-  NOTIFICATIONS: 'chuplingo_notifications_v2.0'
+  NOTIFICATIONS: 'chuplingo_notifications_v2.0',
+  PENDING_REQUEST: 'chuplingo_pending_req_v2.0'
 };
 
 const isValidUUID = (id: string): boolean => {
@@ -186,7 +200,7 @@ const INITIAL_USER: UserProfile = {
     }
   },
   onboardingCompletado: false,
-  rol: 'estudiante'
+  rol: 'student'
 };
 
 const ChuplingoContext = createContext<ChuplingoContextType | undefined>(undefined);
@@ -216,6 +230,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [allQuestions, setAllQuestions] = useState<Question[]>([]);
   const [courseQuestionCounts, setCourseQuestionCounts] = useState<Record<string, number>>({});
   const [topicQuestionCounts, setTopicQuestionCounts] = useState<Record<string, number>>({});
+  const [userPendingRequest, setUserPendingRequest] = useState<SubscriptionRequest | null>(null);
 
   const [sessions, setSessions] = useState<PracticeSession[]>(() => {
     try {
@@ -379,112 +394,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [mapDbQuestion]);
 
-  // Target query specifically for each practice session from 8,000 Supabase questions
-  const fetchQuestionsForSession = useCallback(async (params: {
-    courseId?: CourseId;
-    topicId?: string;
-    mode: string;
-    difficulty?: string;
-    count?: number;
-  }): Promise<Question[]> => {
-    setIsLoadingQuestions(true);
-    try {
-      const targetCount = params.count || (
-        params.mode === 'rapida' ? 10 :
-        params.mode === 'estandar' ? 20 :
-        params.mode === 'intensiva' ? 30 :
-        params.mode === 'simulacro' ? 25 : 10
-      );
-
-      let query = supabase.from('questions').select('*').eq('active', true);
-
-      if (params.mode === 'simulacro') {
-        // Multi-course admission exam
-        const { data, error } = await supabase
-          .from('questions')
-          .select('*')
-          .eq('active', true)
-          .limit(100);
-
-        if (error || !data) return [];
-        const mapped = data.map(mapDbQuestion);
-        return shuffleList(mapped).slice(0, targetCount);
-      }
-
-      if (params.mode === 'errores') {
-        const errorQuestionIds = mistakes.filter(m => !m.dominada).map(m => m.questionId);
-        if (errorQuestionIds.length === 0) return [];
-        const { data, error } = await supabase
-          .from('questions')
-          .select('*')
-          .in('id', errorQuestionIds);
-        if (error || !data) return [];
-        return shuffleList(data.map(mapDbQuestion)).slice(0, targetCount);
-      }
-
-      if (params.mode === 'favoritos') {
-        if (favoriteQuestionIds.length === 0) return [];
-        const { data, error } = await supabase
-          .from('questions')
-          .select('*')
-          .in('id', favoriteQuestionIds);
-        if (error || !data) return [];
-        return shuffleList(data.map(mapDbQuestion)).slice(0, targetCount);
-      }
-
-      // Standard course & topic practice
-      if (params.courseId) {
-        query = query.ilike('course_id', `%${params.courseId}%`);
-      }
-
-      if (params.topicId && params.topicId !== 'all') {
-        query = query.or(`topic_id.ilike.%${params.topicId}%,topic_id.ilike.%${params.topicId.replace(/-/g, ' ')}%`);
-      }
-
-      if (params.difficulty && params.difficulty !== 'todas') {
-        query = query.eq('difficulty', params.difficulty.toLowerCase());
-      }
-
-      // Fetch a healthy sample (up to 150 rows) from Supabase to randomize with Fisher-Yates
-      query = query.limit(150);
-
-      const { data, error } = await query;
-      if (error || !data || data.length === 0) {
-        // Fallback to broader course query
-        const fallbackRes = await supabase
-          .from('questions')
-          .select('*')
-          .ilike('course_id', `%${params.courseId || 'literatura'}%`)
-          .eq('active', true)
-          .limit(50);
-        
-        if (fallbackRes.data && fallbackRes.data.length > 0) {
-          const fallbackMapped = fallbackRes.data.map(mapDbQuestion);
-          return shuffleList(fallbackMapped).slice(0, targetCount);
-        }
-        return [];
-      }
-
-      // Deduplicate by ID
-      const uniqueMap = new Map<string, Question>();
-      data.forEach(row => {
-        const q = mapDbQuestion(row);
-        if (!uniqueMap.has(q.id)) {
-          uniqueMap.set(q.id, q);
-        }
-      });
-
-      const uniqueList = Array.from(uniqueMap.values());
-      const shuffled = shuffleList(uniqueList);
-      return shuffled.slice(0, Math.min(targetCount, shuffled.length));
-    } catch (e) {
-      console.error('[fetchQuestionsForSession error]', e);
-      return [];
-    } finally {
-      setIsLoadingQuestions(false);
-    }
-  }, [mapDbQuestion, mistakes, favoriteQuestionIds]);
-
   const loadUserDataFromSupabase = async (userId: string) => {
     if (!isValidUUID(userId)) return;
 
@@ -497,6 +406,8 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       if (profile) {
         const { level, title } = calculateLevelInfo(profile.xp || 0);
+        const isAdmin = profile.role === 'admin' || user.email === 'admin@chuplingo.pe';
+
         setUser(prev => ({
           ...prev,
           id: userId,
@@ -507,6 +418,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           tituloNivel: title,
           rachaActual: profile.current_streak || 0,
           mejorRacha: profile.best_streak || 0,
+          rol: (isAdmin ? 'admin' : (profile.role as any) || 'student'),
           preferencias: {
             ...prev.preferencias,
             metaDiaria: profile.daily_goal || prev.preferencias.metaDiaria
@@ -516,6 +428,36 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             planId: (profile.plan?.toLowerCase() as PlanId) || 'gratis'
           }
         }));
+      }
+
+      // Check for user pending subscription request
+      try {
+        const { data: reqData } = await supabase
+          .from('subscription_requests')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('status', 'pendiente')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (reqData) {
+          setUserPendingRequest({
+            id: reqData.id,
+            userId: reqData.user_id,
+            plan: reqData.plan as any,
+            price: Number(reqData.price),
+            operationNumber: reqData.operation_number || undefined,
+            phoneNumber: reqData.phone_number || undefined,
+            paymentProofUrl: reqData.payment_proof_url || undefined,
+            status: reqData.status as any,
+            createdAt: reqData.created_at
+          });
+        } else {
+          setUserPendingRequest(null);
+        }
+      } catch {
+        // Table might be initializing
       }
 
       const { data: remoteSessions } = await supabase
@@ -598,8 +540,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             emailVerificado: !!session.user.email_confirmed_at,
             nombre: meta.first_name || meta.nombre || prev.nombre || 'Estudiante',
             apellido: meta.last_name || meta.apellido || prev.apellido || 'Chuplingo',
-            rol: isUserAdmin ? 'admin' : (prev.rol || 'estudiante'),
-            suscripcion: isUserAdmin ? { ...prev.suscripcion, planId: 'vip' } : prev.suscripcion,
+            rol: isUserAdmin ? 'admin' : (prev.rol || 'student'),
             onboardingCompletado: true
           }));
 
@@ -625,8 +566,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           emailVerificado: !!session.user.email_confirmed_at,
           nombre: meta.first_name || meta.nombre || prev.nombre || 'Estudiante',
           apellido: meta.last_name || meta.apellido || prev.apellido || 'Chuplingo',
-          rol: isUserAdmin ? 'admin' : (prev.rol || 'estudiante'),
-          suscripcion: isUserAdmin ? { ...prev.suscripcion, planId: 'vip' } : prev.suscripcion,
+          rol: isUserAdmin ? 'admin' : (prev.rol || 'student'),
           onboardingCompletado: true
         }));
 
@@ -634,6 +574,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       } else if (event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
         setUser(INITIAL_USER);
+        setUserPendingRequest(null);
       }
     });
 
@@ -870,6 +811,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.error('Error on signOut', err);
     }
     setUser({ ...INITIAL_USER, onboardingCompletado: true });
+    setUserPendingRequest(null);
     setIsAuthenticated(false);
     toast.info('Sesión cerrada');
   };
@@ -908,31 +850,228 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return JSON.stringify(exportData, null, 2);
   };
 
+  // For Free Plan downgrade or initial setup
   const changeUserPlan = (planId: PlanId) => {
-    const nextMonth = new Date();
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    if (planId === 'gratis') {
+      setUser(prev => ({
+        ...prev,
+        suscripcion: {
+          planId: 'gratis',
+          estado: 'activa',
+          fechaInicio: getTodayDateString(),
+          fechaRenovacion: '2026-12-31'
+        }
+      }));
 
-    setUser(prev => ({
-      ...prev,
-      suscripcion: {
-        planId,
-        estado: 'activa',
-        fechaInicio: getTodayDateString(),
-        fechaRenovacion: nextMonth.toISOString().split('T')[0],
-        proveedor: planId === 'gratis' ? undefined : 'Pasarela de Pago'
+      if (isAuthenticated && isValidUUID(user.id)) {
+        supabase.from('profiles').update({
+          plan: 'GRATIS',
+          updated_at: new Date().toISOString()
+        }).eq('id', user.id);
       }
-    }));
 
-    if (isAuthenticated && isValidUUID(user.id)) {
-      supabase.from('profiles').update({
-        plan: planId.toUpperCase(),
-        updated_at: new Date().toISOString()
-      }).eq('id', user.id);
+      toast.info('Has vuelto al Plan Gratis');
+    }
+  };
+
+  // Submit Yape subscription request with proof support
+  const submitSubscriptionRequest = async (params: {
+    planId: 'FAN' | 'LOVER' | 'VIP';
+    price: number;
+    operationNumber?: string;
+    phoneNumber?: string;
+    proofFile?: File | null;
+  }): Promise<boolean> => {
+    if (!isAuthenticated || !isValidUUID(user.id)) {
+      toast.error('Debes iniciar sesión para suscribirte');
+      return false;
     }
 
-    playSoundEffect('complete');
-    triggerConfetti();
-    toast.success(`🎉 ¡Plan actualizado a ${planId.toUpperCase()}!`);
+    try {
+      let proofUrl: string | undefined = undefined;
+
+      if (params.proofFile) {
+        const fileExt = params.proofFile.name.split('.').pop() || 'png';
+        const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('payment_proofs')
+          .upload(filePath, params.proofFile, { upsert: true });
+
+        if (!uploadError) {
+          const { data: publicUrlData } = supabase.storage
+            .from('payment_proofs')
+            .getPublicUrl(filePath);
+          proofUrl = publicUrlData?.publicUrl;
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('subscription_requests')
+        .insert({
+          user_id: user.id,
+          plan: params.planId,
+          price: params.price,
+          operation_number: params.operationNumber || null,
+          phone_number: params.phoneNumber || null,
+          payment_proof_url: proofUrl || null,
+          status: 'pendiente',
+          created_at: new Date().toISOString()
+        })
+        .select('*')
+        .single();
+
+      if (error) {
+        toast.error(`Error al enviar la solicitud: ${error.message}`);
+        return false;
+      }
+
+      if (data) {
+        setUserPendingRequest({
+          id: data.id,
+          userId: data.user_id,
+          plan: data.plan as any,
+          price: Number(data.price),
+          operationNumber: data.operation_number || undefined,
+          phoneNumber: data.phone_number || undefined,
+          paymentProofUrl: data.payment_proof_url || undefined,
+          status: 'pendiente',
+          createdAt: data.created_at
+        });
+      }
+
+      toast.success(`🎉 Solicitud enviada para el Plan ${params.planId}. Revisaremos tu pago Yape en breve.`);
+      return true;
+    } catch (err: any) {
+      toast.error('Error al procesar la solicitud de suscripción');
+      return false;
+    }
+  };
+
+  // Admin: Fetch all subscription requests
+  const fetchAdminSubscriptionRequests = async (): Promise<SubscriptionRequest[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('subscription_requests')
+        .select(`
+          *,
+          profiles:user_id (
+            first_name,
+            last_name
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error || !data) return [];
+
+      return data.map((item: any) => ({
+        id: item.id,
+        userId: item.user_id,
+        plan: item.plan as any,
+        price: Number(item.price),
+        operationNumber: item.operation_number || undefined,
+        phoneNumber: item.phone_number || undefined,
+        paymentProofUrl: item.payment_proof_url || undefined,
+        status: item.status as any,
+        rejectionReason: item.rejection_reason || undefined,
+        createdAt: item.created_at,
+        reviewedAt: item.reviewed_at || undefined,
+        reviewedBy: item.reviewed_by || undefined,
+        userName: item.profiles ? `${item.profiles.first_name || ''} ${item.profiles.last_name || ''}`.trim() : undefined
+      }));
+    } catch {
+      return [];
+    }
+  };
+
+  // Admin: Approve Request
+  const approveSubscriptionRequest = async (requestId: string, targetUserId: string, plan: string, price: number): Promise<boolean> => {
+    try {
+      const nextMonth = new Date();
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+
+      // 1. Update request status
+      const { error: reqErr } = await supabase
+        .from('subscription_requests')
+        .update({
+          status: 'aprobada',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user.id
+        })
+        .eq('id', requestId);
+
+      if (reqErr) {
+        toast.error(`Error al actualizar solicitud: ${reqErr.message}`);
+        return false;
+      }
+
+      // 2. Insert or update active subscriptions
+      await supabase.from('subscriptions').insert({
+        user_id: targetUserId,
+        plan: plan.toUpperCase(),
+        status: 'activa',
+        price: price,
+        started_at: new Date().toISOString(),
+        renewal_date: nextMonth.toISOString(),
+        provider: 'YAPE'
+      });
+
+      // 3. Update target user profile plan
+      await supabase.from('profiles').update({
+        plan: plan.toUpperCase(),
+        updated_at: new Date().toISOString()
+      }).eq('id', targetUserId);
+
+      // If current active user is the target, update local state
+      if (user.id === targetUserId) {
+        setUser(prev => ({
+          ...prev,
+          suscripcion: {
+            planId: plan.toLowerCase() as PlanId,
+            estado: 'activa',
+            fechaInicio: getTodayDateString(),
+            fechaRenovacion: nextMonth.toISOString().split('T')[0],
+            proveedor: 'YAPE'
+          }
+        }));
+        setUserPendingRequest(null);
+      }
+
+      toast.success(`✓ Suscripción para el Plan ${plan} aprobada y activada`);
+      return true;
+    } catch (err: any) {
+      toast.error('Error al aprobar suscripción');
+      return false;
+    }
+  };
+
+  // Admin: Reject Request
+  const rejectSubscriptionRequest = async (requestId: string, reason?: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('subscription_requests')
+        .update({
+          status: 'rechazada',
+          rejection_reason: reason || 'Pago no verificado',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user.id
+        })
+        .eq('id', requestId);
+
+      if (error) {
+        toast.error(`Error: ${error.message}`);
+        return false;
+      }
+
+      if (userPendingRequest?.id === requestId) {
+        setUserPendingRequest(null);
+      }
+
+      toast.info('Solicitud rechazada');
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const recordSession = async (sessionData: Omit<PracticeSession, 'id' | 'userId' | 'fecha' | 'xpGanado'>): Promise<PracticeSession> => {
@@ -1242,6 +1381,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setClaimedChallengeIds([]);
     setAchievements(INITIAL_ACHIEVEMENTS);
     setAllQuestions([]);
+    setUserPendingRequest(null);
     toast.info('Se han restablecido todos los datos locales');
   };
 
@@ -1553,6 +1693,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isLoadingQuestions,
         courseQuestionCounts,
         topicQuestionCounts,
+        userPendingRequest,
         fetchQuestionsForSession,
         fetchQuestionsFromSupabase,
         registerUser,
@@ -1571,6 +1712,10 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         updateUserPreferences,
         updateUserName,
         changeUserPlan,
+        submitSubscriptionRequest,
+        fetchAdminSubscriptionRequests,
+        approveSubscriptionRequest,
+        rejectSubscriptionRequest,
         claimChallengeReward,
         resetAllProgress,
         completeOnboarding,

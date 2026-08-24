@@ -16,6 +16,7 @@ export interface Database {
           last_name: string | null
           avatar_url: string | null
           plan: string
+          role: string
           xp: number
           level: number
           current_streak: number
@@ -30,6 +31,7 @@ export interface Database {
           last_name?: string | null
           avatar_url?: string | null
           plan?: string
+          role?: string
           xp?: number
           level?: number
           current_streak?: number
@@ -44,6 +46,7 @@ export interface Database {
           last_name?: string | null
           avatar_url?: string | null
           plan?: string
+          role?: string
           xp?: number
           level?: number
           current_streak?: number
@@ -51,6 +54,50 @@ export interface Database {
           daily_goal?: number
           created_at?: string
           updated_at?: string
+        }
+      }
+      subscription_requests: {
+        Row: {
+          id: string
+          user_id: string
+          plan: string
+          price: number
+          operation_number: string | null
+          phone_number: string | null
+          payment_proof_url: string | null
+          status: string
+          rejection_reason: string | null
+          created_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          plan: string
+          price: number
+          operation_number?: string | null
+          phone_number?: string | null
+          payment_proof_url?: string | null
+          status?: string
+          rejection_reason?: string | null
+          created_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          plan?: string
+          price?: number
+          operation_number?: string | null
+          phone_number?: string | null
+          payment_proof_url?: string | null
+          status?: string
+          rejection_reason?: string | null
+          created_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
         }
       }
       courses: {
