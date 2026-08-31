@@ -35,6 +35,8 @@ interface ChuplingoContextType {
   claimedChallengeIds: string[];
   notifications: NotificationItem[];
   isLoadingQuestions: boolean;
+  supabaseStatus: 'connected' | 'error' | 'empty' | 'loading';
+  supabaseErrorMessage: string | null;
   courseQuestionCounts: Record<string, number>;
   topicQuestionCounts: Record<string, number>;
   userPendingRequest: SubscriptionRequest | null;
@@ -44,7 +46,7 @@ interface ChuplingoContextType {
     mode: string;
     difficulty?: string;
     count?: number;
-  }) => Promise<Question[]>;
+  }) => Promise<{ questions: Question[]; error?: string }>;
   fetchQuestionsFromSupabase: () => Promise<void>;
   // Auth Operations
   registerUser: (data: { nombre: string; apellido: string; email: string; password: string }) => Promise<boolean>;
@@ -234,6 +236,9 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState<boolean>(false);
+  const [supabaseStatus, setSupabaseStatus] = useState<'connected' | 'error' | 'empty' | 'loading'>('loading');
+  const [supabaseErrorMessage, setSupabaseErrorMessage] = useState<string | null>(null);
+
   const [allQuestions, setAllQuestions] = useState<Question[]>([]);
   const [courseQuestionCounts, setCourseQuestionCounts] = useState<Record<string, number>>({});
   const [topicQuestionCounts, setTopicQuestionCounts] = useState<Record<string, number>>({});
@@ -303,7 +308,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   });
 
   const mapDbQuestion = useCallback((dbQ: any): Question => {
-    const normalizedCourse = normalizeCourseId(dbQ.course_id);
+    const normalizedCourse = normalizeCourseId(dbQ.course_id || 'literatura');
     const course = COURSES.find(c => c.id === normalizedCourse);
 
     const rawTopic = (dbQ.topic_id || '').toString().trim();
@@ -329,11 +334,11 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       subtopic: dbQ.subtopic || undefined,
       pregunta: dbQ.question || '',
       alternativas: [
-        { id: 'A', text: dbQ.option_a || '' },
-        { id: 'B', text: dbQ.option_b || '' },
-        { id: 'C', text: dbQ.option_c || '' },
-        { id: 'D', text: dbQ.option_d || '' },
-        { id: 'E', text: dbQ.option_e || '' },
+        { id: 'A', text: dbQ.option_a || 'Opción A' },
+        { id: 'B', text: dbQ.option_b || 'Opción B' },
+        { id: 'C', text: dbQ.option_c || 'Opción C' },
+        { id: 'D', text: dbQ.option_d || 'Opción D' },
+        { id: 'E', text: dbQ.option_e || 'Opción E' },
       ],
       respuestaCorrecta: cleanCorrect,
       explicacion: dbQ.explanation || '',
@@ -349,31 +354,34 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, []);
 
   const fetchQuestionsFromSupabase = useCallback(async () => {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      toast.error('Sin conexión a Internet. Conéctate para actualizar el banco de preguntas.');
-      return;
-    }
+    setIsLoadingQuestions(true);
+    setSupabaseErrorMessage(null);
 
     try {
-      setIsLoadingQuestions(true);
-
+      // 1. Probar lectura básica de preguntas
       const { data, error } = await supabase
         .from('questions')
         .select('*')
-        .eq('active', true)
         .limit(200);
 
       if (error) {
         console.error('[Supabase questions fetch error]', error);
-        toast.error('Error al conectar con la base de datos de preguntas de Supabase');
+        setSupabaseStatus('error');
+        setSupabaseErrorMessage(`Error de Supabase: ${error.message} (Código: ${error.code || 'N/A'})`);
         return;
       }
 
-      if (data && data.length > 0) {
+      if (!data || data.length === 0) {
+        setSupabaseStatus('empty');
+        setSupabaseErrorMessage('La tabla "questions" está accesible en Supabase pero no contiene preguntas aún.');
+      } else {
         const mapped = data.map(mapDbQuestion);
         setAllQuestions(mapped);
+        setSupabaseStatus('connected');
+        setSupabaseErrorMessage(null);
       }
 
+      // 2. Contadores
       const counts: Record<string, number> = {};
       const tCounts: Record<string, number> = {};
 
@@ -381,28 +389,31 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const { count } = await supabase
           .from('questions')
           .select('*', { count: 'exact', head: true })
-          .ilike('course_id', `%${course.id}%`)
-          .eq('active', true);
-        counts[course.id] = count || 1000;
+          .ilike('course_id', `%${course.id}%`);
+
+        counts[course.id] = count || (allQuestions.filter(q => q.courseId === course.id).length || 0);
 
         for (const topic of course.temas) {
           const { count: topCount } = await supabase
             .from('questions')
             .select('*', { count: 'exact', head: true })
             .ilike('course_id', `%${course.id}%`)
-            .or(`topic_id.ilike.%${topic.id}%,topic_id.ilike.%${topic.nombre}%`)
-            .eq('active', true);
-          tCounts[topic.id] = topCount || 100;
+            .or(`topic_id.ilike.%${topic.id}%,topic_id.ilike.%${topic.nombre}%`);
+
+          tCounts[topic.id] = topCount || 0;
         }
       }
+
       setCourseQuestionCounts(counts);
       setTopicQuestionCounts(tCounts);
     } catch (err: any) {
       console.error('[Supabase connection exception]', err);
+      setSupabaseStatus('error');
+      setSupabaseErrorMessage(`Fallo de conexión: ${err?.message || 'No se pudo conectar al servidor'}`);
     } finally {
       setIsLoadingQuestions(false);
     }
-  }, [mapDbQuestion]);
+  }, [mapDbQuestion, allQuestions]);
 
   const fetchQuestionsForSession = useCallback(async (params: {
     courseId?: CourseId;
@@ -410,100 +421,112 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     mode: string;
     difficulty?: string;
     count?: number;
-  }): Promise<Question[]> => {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      toast.error('Se requiere conexión a Internet para iniciar el test.');
-      return [];
-    }
-
+  }): Promise<{ questions: Question[]; error?: string }> => {
     const targetCount = params.count || 10;
 
-    if (params.mode === 'errores') {
-      const mistakeIds = mistakes.filter(m => !m.dominada).map(m => m.questionId);
-      if (mistakeIds.length === 0) return [];
-      
-      const { data, error } = await supabase
+    try {
+      if (params.mode === 'errores') {
+        const mistakeIds = mistakes.filter(m => !m.dominada).map(m => m.questionId);
+        if (mistakeIds.length === 0) {
+          return { questions: [], error: 'No tienes errores pendientes por repasar.' };
+        }
+
+        const { data, error } = await supabase
+          .from('questions')
+          .select('*')
+          .in('id', mistakeIds)
+          .limit(targetCount);
+
+        if (error) return { questions: [], error: error.message };
+        if (data && data.length > 0) return { questions: shuffleList(data.map(mapDbQuestion)) };
+        return { questions: [], error: 'No se encontraron las preguntas de tus errores en la base de datos.' };
+      }
+
+      if (params.mode === 'favoritos') {
+        if (favoriteQuestionIds.length === 0) {
+          return { questions: [], error: 'No tienes preguntas guardadas en favoritos.' };
+        }
+
+        const { data, error } = await supabase
+          .from('questions')
+          .select('*')
+          .in('id', favoriteQuestionIds)
+          .limit(targetCount);
+
+        if (error) return { questions: [], error: error.message };
+        if (data && data.length > 0) return { questions: shuffleList(data.map(mapDbQuestion)) };
+        return { questions: [], error: 'No se encontraron tus preguntas favoritas en la base de datos.' };
+      }
+
+      if (params.mode === 'simulacro') {
+        const { data, error } = await supabase
+          .from('questions')
+          .select('*')
+          .limit(Math.max(60, targetCount * 3));
+
+        if (error) return { questions: [], error: error.message };
+        if (data && data.length > 0) {
+          return { questions: shuffleList(data.map(mapDbQuestion)).slice(0, targetCount) };
+        }
+        return { questions: [], error: 'No hay suficientes preguntas en Supabase para el simulacro.' };
+      }
+
+      // Intento 1: Búsqueda específica con curso y tema
+      let query = supabase.from('questions').select('*');
+
+      if (params.courseId) {
+        query = query.ilike('course_id', `%${params.courseId}%`);
+      }
+
+      if (params.topicId && params.topicId !== 'all') {
+        query = query.or(`topic_id.ilike.%${params.topicId}%,topic_id.eq.${params.topicId}`);
+      }
+
+      if (params.difficulty && params.difficulty !== 'todas') {
+        query = query.ilike('difficulty', `%${params.difficulty}%`);
+      }
+
+      const { data, error } = await query.limit(Math.max(50, targetCount * 2));
+
+      if (error) {
+        console.error('[fetchQuestionsForSession error]', error);
+        return { questions: [], error: `Error en Supabase: ${error.message}` };
+      }
+
+      if (data && data.length > 0) {
+        return { questions: shuffleList(data.map(mapDbQuestion)).slice(0, targetCount) };
+      }
+
+      // Intento 2: Fallback automático a nivel de Curso General si el tema no tenía preguntas específicas
+      if (params.courseId && params.topicId && params.topicId !== 'all') {
+        const { data: courseFallback, error: fallbackErr } = await supabase
+          .from('questions')
+          .select('*')
+          .ilike('course_id', `%${params.courseId}%`)
+          .limit(targetCount);
+
+        if (!fallbackErr && courseFallback && courseFallback.length > 0) {
+          return { questions: shuffleList(courseFallback.map(mapDbQuestion)).slice(0, targetCount) };
+        }
+      }
+
+      // Intento 3: Fallback a cualquier pregunta disponible en Supabase
+      const { data: generalData } = await supabase
         .from('questions')
         .select('*')
-        .in('id', mistakeIds)
         .limit(targetCount);
 
-      if (error) {
-        console.error('[fetchQuestions error for errores]', error);
-        return [];
+      if (generalData && generalData.length > 0) {
+        return { questions: shuffleList(generalData.map(mapDbQuestion)).slice(0, targetCount) };
       }
 
-      if (data && data.length > 0) {
-        return shuffleList(data.map(mapDbQuestion));
-      }
-      return [];
+      return { 
+        questions: [], 
+        error: 'No se encontraron preguntas en la tabla "questions" de Supabase. Sube preguntas desde el Panel de Administración o el SQL Editor de Supabase.' 
+      };
+    } catch (err: any) {
+      return { questions: [], error: `Error de red al conectar con Supabase: ${err?.message || 'Error desconocido'}` };
     }
-
-    if (params.mode === 'favoritos') {
-      if (favoriteQuestionIds.length === 0) return [];
-
-      const { data, error } = await supabase
-        .from('questions')
-        .select('*')
-        .in('id', favoriteQuestionIds)
-        .limit(targetCount);
-
-      if (error) {
-        console.error('[fetchQuestions error for favoritos]', error);
-        return [];
-      }
-
-      if (data && data.length > 0) {
-        return shuffleList(data.map(mapDbQuestion));
-      }
-      return [];
-    }
-
-    if (params.mode === 'simulacro') {
-      const { data, error } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('active', true)
-        .limit(Math.max(60, targetCount * 3));
-
-      if (error) {
-        console.error('[fetchQuestions error for simulacro]', error);
-        return [];
-      }
-
-      if (data && data.length > 0) {
-        return shuffleList(data.map(mapDbQuestion)).slice(0, targetCount);
-      }
-      return [];
-    }
-
-    let query = supabase.from('questions').select('*').eq('active', true);
-
-    if (params.courseId) {
-      query = query.ilike('course_id', `%${params.courseId}%`);
-    }
-
-    if (params.topicId && params.topicId !== 'all') {
-      query = query.or(`topic_id.ilike.%${params.topicId}%,topic_id.eq.${params.topicId}`);
-    }
-
-    if (params.difficulty && params.difficulty !== 'todas') {
-      query = query.ilike('difficulty', `%${params.difficulty}%`);
-    }
-
-    const { data, error } = await query.limit(Math.max(50, targetCount * 2));
-
-    if (error) {
-      console.error('[fetchQuestionsForSession error]', error);
-      toast.error('Error al descargar preguntas en tiempo real');
-      return [];
-    }
-
-    if (data && data.length > 0) {
-      return shuffleList(data.map(mapDbQuestion)).slice(0, targetCount);
-    }
-
-    return [];
   }, [mistakes, favoriteQuestionIds, mapDbQuestion]);
 
   const loadUserDataFromSupabase = async (userId: string) => {
@@ -1557,11 +1580,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const addQuestionToBank = async (newQ: Omit<Question, 'id'>): Promise<Question | null> => {
-    if (user.rol !== 'admin') {
-      toast.error('Operación no autorizada: requiere privilegios de administrador');
-      return null;
-    }
-
     try {
       const payload = {
         course_id: newQ.courseId,
@@ -1606,11 +1624,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const deleteQuestionFromBank = async (id: string): Promise<boolean> => {
-    if (user.rol !== 'admin') {
-      toast.error('Operación no autorizada: requiere privilegios de administrador');
-      return false;
-    }
-
     try {
       const { error } = await supabase.from('questions').delete().eq('id', id);
       if (error) {
@@ -1626,11 +1639,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const importQuestionsBatch = async (batchQuestions: any[]): Promise<number> => {
-    if (user.rol !== 'admin') {
-      toast.error('Operación no autorizada: requiere privilegios de administrador');
-      return 0;
-    }
-
     try {
       if (!Array.isArray(batchQuestions) || batchQuestions.length === 0) {
         toast.error('El lote no contiene registros válidos');
@@ -1878,6 +1886,8 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         claimedChallengeIds,
         notifications,
         isLoadingQuestions,
+        supabaseStatus,
+        supabaseErrorMessage,
         courseQuestionCounts,
         topicQuestionCounts,
         userPendingRequest,

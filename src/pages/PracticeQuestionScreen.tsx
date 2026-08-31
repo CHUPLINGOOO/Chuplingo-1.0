@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { COURSES } from '../data/coursesData';
 import { Question, QuestionAttempt, CourseId, PracticeMode } from '../types/chuplingo';
 import { useChuplingo } from '../context/ChuplingoContext';
-import { Star, ArrowRight, CheckCircle2, XCircle, Lightbulb, ArrowLeft, Timer, Sparkles, AlertTriangle, RefreshCw, WifiOff } from 'lucide-react';
+import { Star, ArrowRight, CheckCircle2, XCircle, Lightbulb, ArrowLeft, Timer, Sparkles, AlertTriangle, RefreshCw, WifiOff, Database } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PracticeQuestionScreen: React.FC = () => {
@@ -15,7 +15,9 @@ const PracticeQuestionScreen: React.FC = () => {
     isFavorite, 
     recordSession, 
     isLoadingQuestions,
-    isOnline 
+    isOnline,
+    supabaseStatus,
+    supabaseErrorMessage 
   } = useChuplingo();
 
   const courseParam = (searchParams.get('course') as CourseId) || 'literatura';
@@ -41,37 +43,27 @@ const PracticeQuestionScreen: React.FC = () => {
     setLoadError(null);
     setHasLoaded(false);
 
-    if (!navigator.onLine) {
-      setLoadError('Se requiere conexión a Internet para cargar las preguntas desde Supabase.');
-      setHasLoaded(true);
-      return;
-    }
-
     const questionsCount = 
       modeParam === 'rapida' ? 10 :
       modeParam === 'estandar' ? 20 :
       modeParam === 'intensiva' ? 30 :
       modeParam === 'simulacro' ? 25 : 10;
 
-    try {
-      const questions = await fetchQuestionsForSession({
-        courseId: courseParam,
-        topicId: topicParam,
-        mode: modeParam,
-        difficulty: difficultyParam,
-        count: questionsCount
-      });
+    const result = await fetchQuestionsForSession({
+      courseId: courseParam,
+      topicId: topicParam,
+      mode: modeParam,
+      difficulty: difficultyParam,
+      count: questionsCount
+    });
 
-      if (questions && questions.length > 0) {
-        setSessionQuestions(questions);
-      } else {
-        setLoadError('No se encontraron preguntas en Supabase para este filtro.');
-      }
-    } catch (e: any) {
-      setLoadError(`Error de conexión con Supabase: ${e?.message || 'Fallo de red'}`);
-    } finally {
-      setHasLoaded(true);
+    if (result.questions && result.questions.length > 0) {
+      setSessionQuestions(result.questions);
+      setLoadError(null);
+    } else {
+      setLoadError(result.error || supabaseErrorMessage || 'No se encontraron preguntas en Supabase.');
     }
+    setHasLoaded(true);
   };
 
   useEffect(() => {
@@ -106,8 +98,8 @@ const PracticeQuestionScreen: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#F7F8FC] flex flex-col items-center justify-center p-6 text-center">
         <Sparkles className="w-10 h-10 text-[#F05C54] animate-spin mb-3" />
-        <p className="text-sm font-black text-[#183153]">Conectando con Supabase...</p>
-        <p className="text-xs text-slate-400 mt-1">Descargando preguntas en vivo a través de Internet</p>
+        <p className="text-sm font-black text-[#183153]">Consultando Supabase...</p>
+        <p className="text-xs text-slate-400 mt-1">Conectando a https://hxgvvdudphmulqwgenps.supabase.co</p>
       </div>
     );
   }
@@ -118,29 +110,38 @@ const PracticeQuestionScreen: React.FC = () => {
         {!isOnline ? (
           <WifiOff className="w-12 h-12 text-rose-500 mb-3 animate-pulse" />
         ) : (
-          <AlertTriangle className="w-12 h-12 text-amber-500 mb-3" />
+          <Database className="w-12 h-12 text-[#F05C54] mb-3" />
         )}
 
         <h2 className="text-base font-black text-[#183153]">
-          {!isOnline ? 'Sin conexión a Internet' : 'Preguntas no disponibles'}
+          {!isOnline ? 'Sin conexión a Internet' : 'Estado de Supabase'}
         </h2>
 
-        <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
-          {loadError || 'La aplicación requiere conexión a Internet para descargar el banco de preguntas oficial desde Supabase.'}
-        </p>
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 mt-2 max-w-xs text-left">
+          <p className="text-[11px] text-rose-800 font-medium leading-relaxed">
+            {loadError || supabaseErrorMessage || 'No se pudieron recuperar las preguntas desde Supabase.'}
+          </p>
+        </div>
 
-        <div className="flex gap-2 mt-5">
+        <div className="flex flex-col gap-2 mt-5 w-full max-w-xs">
           <button
             onClick={loadSession}
-            className="px-4 py-2.5 bg-[#F05C54] hover:bg-[#E04B43] text-white rounded-2xl text-xs font-black shadow-sm flex items-center gap-1.5 transition-transform active:scale-95"
+            className="w-full py-3.5 bg-[#F05C54] hover:bg-[#E04B43] text-white rounded-2xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Reintentar descarga</span>
+            <RefreshCw className="w-4 h-4" />
+            <span>Reintentar conexión con Supabase</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/admin')}
+            className="w-full py-3 bg-[#183153] hover:bg-[#10223A] text-white rounded-2xl text-xs font-bold transition-colors"
+          >
+            Ir al Panel Admin (Importar preguntas)
           </button>
 
           <button
             onClick={() => navigate('/courses')}
-            className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-2xl text-xs font-bold transition-colors"
+            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-xs font-bold transition-colors"
           >
             Volver a Cursos
           </button>
