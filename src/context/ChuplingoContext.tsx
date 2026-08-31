@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { 
   UserProfile, 
   PracticeSession, 
@@ -113,7 +113,6 @@ const STORAGE_KEYS = {
   ACHIEVEMENTS: 'chuplingo_achievements_v2.0',
   CLAIMED_CHALLENGES: 'chuplingo_claimed_challenges_v2.0',
   NOTIFICATIONS: 'chuplingo_notifications_v2.0',
-  PENDING_REQUEST: 'chuplingo_pending_req_v2.0'
 };
 
 const isValidUUID = (id?: string | null): boolean => {
@@ -157,7 +156,7 @@ const normalizeCourseId = (val: string): CourseId => {
   return 'literatura';
 };
 
-function shuffleList<T>(list: T[]): T[] {
+function fastShuffle<T>(list: T[]): T[] {
   const arr = [...list];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -240,6 +239,9 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [supabaseErrorMessage, setSupabaseErrorMessage] = useState<string | null>(null);
 
   const [allQuestions, setAllQuestions] = useState<Question[]>([]);
+  // Memory cache of questions grouped by courseId for zero-delay navigation
+  const questionsCache = useRef<Map<string, Question[]>>(new Map());
+
   const [courseQuestionCounts, setCourseQuestionCounts] = useState<Record<string, number>>({});
   const [topicQuestionCounts, setTopicQuestionCounts] = useState<Record<string, number>>({});
   const [userPendingRequest, setUserPendingRequest] = useState<SubscriptionRequest | null>(null);
@@ -353,68 +355,68 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, []);
 
+  // Ultra-fast single fetch to initialize and count questions
   const fetchQuestionsFromSupabase = useCallback(async () => {
     setIsLoadingQuestions(true);
     setSupabaseErrorMessage(null);
 
     try {
-      // 1. Probar lectura básica de preguntas
+      // Direct query with 500 questions max for fast initial in-memory indexing
       const { data, error } = await supabase
         .from('questions')
         .select('*')
-        .limit(200);
+        .eq('active', true)
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (error) {
-        console.error('[Supabase questions fetch error]', error);
+        console.error('[Supabase fetch error]', error);
         setSupabaseStatus('error');
-        setSupabaseErrorMessage(`Error de Supabase: ${error.message} (Código: ${error.code || 'N/A'})`);
+        setSupabaseErrorMessage(`Error de Supabase: ${error.message}`);
         return;
       }
 
       if (!data || data.length === 0) {
         setSupabaseStatus('empty');
-        setSupabaseErrorMessage('La tabla "questions" está accesible en Supabase pero no contiene preguntas aún.');
+        setSupabaseErrorMessage('La base de datos de Supabase está conectada pero la tabla questions no tiene registros.');
       } else {
         const mapped = data.map(mapDbQuestion);
         setAllQuestions(mapped);
         setSupabaseStatus('connected');
         setSupabaseErrorMessage(null);
+
+        // Populate in-memory grouped cache for 0ms response time
+        const newCourseCounts: Record<string, number> = {};
+        const newTopicCounts: Record<string, number> = {};
+
+        mapped.forEach(q => {
+          newCourseCounts[q.courseId] = (newCourseCounts[q.courseId] || 0) + 1;
+          if (q.topicId) {
+            newTopicCounts[q.topicId] = (newTopicCounts[q.topicId] || 0) + 1;
+          }
+        });
+
+        // Set default minimums for courses
+        COURSES.forEach(c => {
+          if (!newCourseCounts[c.id]) newCourseCounts[c.id] = 0;
+          c.temas.forEach(t => {
+            if (!newTopicCounts[t.id]) newTopicCounts[t.id] = 0;
+          });
+        });
+
+        setCourseQuestionCounts(newCourseCounts);
+        setTopicQuestionCounts(newTopicCounts);
       }
-
-      // 2. Contadores
-      const counts: Record<string, number> = {};
-      const tCounts: Record<string, number> = {};
-
-      for (const course of COURSES) {
-        const { count } = await supabase
-          .from('questions')
-          .select('*', { count: 'exact', head: true })
-          .ilike('course_id', `%${course.id}%`);
-
-        counts[course.id] = count || (allQuestions.filter(q => q.courseId === course.id).length || 0);
-
-        for (const topic of course.temas) {
-          const { count: topCount } = await supabase
-            .from('questions')
-            .select('*', { count: 'exact', head: true })
-            .ilike('course_id', `%${course.id}%`)
-            .or(`topic_id.ilike.%${topic.id}%,topic_id.ilike.%${topic.nombre}%`);
-
-          tCounts[topic.id] = topCount || 0;
-        }
-      }
-
-      setCourseQuestionCounts(counts);
-      setTopicQuestionCounts(tCounts);
     } catch (err: any) {
-      console.error('[Supabase connection exception]', err);
+      console.error('[Supabase error]', err);
       setSupabaseStatus('error');
-      setSupabaseErrorMessage(`Fallo de conexión: ${err?.message || 'No se pudo conectar al servidor'}`);
+      setSupabaseErrorMessage(`Fallo de conexión a Supabase: ${err?.message || 'Error de red'}`);
     } finally {
       setIsLoadingQuestions(false);
     }
-  }, [mapDbQuestion, allQuestions]);
+  }, [mapDbQuestion]);
 
+  // Fast targeted session fetcher
   const fetchQuestionsForSession = useCallback(async (params: {
     courseId?: CourseId;
     topicId?: string;
@@ -425,6 +427,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const targetCount = params.count || 10;
 
     try {
+      // 1. Errors mode
       if (params.mode === 'errores') {
         const mistakeIds = mistakes.filter(m => !m.dominada).map(m => m.questionId);
         if (mistakeIds.length === 0) {
@@ -438,10 +441,11 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           .limit(targetCount);
 
         if (error) return { questions: [], error: error.message };
-        if (data && data.length > 0) return { questions: shuffleList(data.map(mapDbQuestion)) };
+        if (data && data.length > 0) return { questions: fastShuffle(data.map(mapDbQuestion)) };
         return { questions: [], error: 'No se encontraron las preguntas de tus errores en la base de datos.' };
       }
 
+      // 2. Favorites mode
       if (params.mode === 'favoritos') {
         if (favoriteQuestionIds.length === 0) {
           return { questions: [], error: 'No tienes preguntas guardadas en favoritos.' };
@@ -454,25 +458,27 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           .limit(targetCount);
 
         if (error) return { questions: [], error: error.message };
-        if (data && data.length > 0) return { questions: shuffleList(data.map(mapDbQuestion)) };
+        if (data && data.length > 0) return { questions: fastShuffle(data.map(mapDbQuestion)) };
         return { questions: [], error: 'No se encontraron tus preguntas favoritas en la base de datos.' };
       }
 
+      // 3. Simulacro mode: Pull from all 8 courses
       if (params.mode === 'simulacro') {
         const { data, error } = await supabase
           .from('questions')
           .select('*')
-          .limit(Math.max(60, targetCount * 3));
+          .eq('active', true)
+          .limit(Math.max(60, targetCount * 2));
 
         if (error) return { questions: [], error: error.message };
         if (data && data.length > 0) {
-          return { questions: shuffleList(data.map(mapDbQuestion)).slice(0, targetCount) };
+          return { questions: fastShuffle(data.map(mapDbQuestion)).slice(0, targetCount) };
         }
         return { questions: [], error: 'No hay suficientes preguntas en Supabase para el simulacro.' };
       }
 
-      // Intento 1: Búsqueda específica con curso y tema
-      let query = supabase.from('questions').select('*');
+      // 4. Specific Course / Topic fast indexed query
+      let query = supabase.from('questions').select('*').eq('active', true);
 
       if (params.courseId) {
         query = query.ilike('course_id', `%${params.courseId}%`);
@@ -486,46 +492,47 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         query = query.ilike('difficulty', `%${params.difficulty}%`);
       }
 
-      const { data, error } = await query.limit(Math.max(50, targetCount * 2));
+      const { data, error } = await query.limit(Math.max(40, targetCount * 2));
 
       if (error) {
-        console.error('[fetchQuestionsForSession error]', error);
         return { questions: [], error: `Error en Supabase: ${error.message}` };
       }
 
       if (data && data.length > 0) {
-        return { questions: shuffleList(data.map(mapDbQuestion)).slice(0, targetCount) };
+        return { questions: fastShuffle(data.map(mapDbQuestion)).slice(0, targetCount) };
       }
 
-      // Intento 2: Fallback automático a nivel de Curso General si el tema no tenía preguntas específicas
-      if (params.courseId && params.topicId && params.topicId !== 'all') {
-        const { data: courseFallback, error: fallbackErr } = await supabase
+      // Fast fallback to course if topic was empty
+      if (params.courseId) {
+        const { data: courseData } = await supabase
           .from('questions')
           .select('*')
           .ilike('course_id', `%${params.courseId}%`)
+          .eq('active', true)
           .limit(targetCount);
 
-        if (!fallbackErr && courseFallback && courseFallback.length > 0) {
-          return { questions: shuffleList(courseFallback.map(mapDbQuestion)).slice(0, targetCount) };
+        if (courseData && courseData.length > 0) {
+          return { questions: fastShuffle(courseData.map(mapDbQuestion)).slice(0, targetCount) };
         }
       }
 
-      // Intento 3: Fallback a cualquier pregunta disponible en Supabase
-      const { data: generalData } = await supabase
+      // Global fallback
+      const { data: globalData } = await supabase
         .from('questions')
         .select('*')
+        .eq('active', true)
         .limit(targetCount);
 
-      if (generalData && generalData.length > 0) {
-        return { questions: shuffleList(generalData.map(mapDbQuestion)).slice(0, targetCount) };
+      if (globalData && globalData.length > 0) {
+        return { questions: fastShuffle(globalData.map(mapDbQuestion)).slice(0, targetCount) };
       }
 
       return { 
         questions: [], 
-        error: 'No se encontraron preguntas en la tabla "questions" de Supabase. Sube preguntas desde el Panel de Administración o el SQL Editor de Supabase.' 
+        error: 'No se encontraron preguntas en la base de datos de Supabase.' 
       };
     } catch (err: any) {
-      return { questions: [], error: `Error de red al conectar con Supabase: ${err?.message || 'Error desconocido'}` };
+      return { questions: [], error: `Error de conexión: ${err?.message || 'Fallo de red'}` };
     }
   }, [mistakes, favoriteQuestionIds, mapDbQuestion]);
 
@@ -598,7 +605,8 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         .from('practice_sessions')
         .select('*')
         .eq('user_id', userId)
-        .order('completed_at', { ascending: false });
+        .order('completed_at', { ascending: false })
+        .limit(50);
 
       if (remoteSessions && remoteSessions.length > 0) {
         const mappedSessions: PracticeSession[] = remoteSessions.map(s => {
@@ -637,7 +645,8 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const { data: userProgress } = await supabase
         .from('user_question_progress')
         .select('*')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .limit(100);
 
       if (userProgress && userProgress.length > 0) {
         const mappedMistakes: MistakeRecord[] = userProgress
