@@ -26,6 +26,16 @@ export type PlanId = 'gratis' | 'fan' | 'lover' | 'vip';
 
 export type UserRole = 'student' | 'admin';
 
+export type AvatarId = 
+  | 'parrot-classic' 
+  | 'parrot-scholar' 
+  | 'parrot-champion' 
+  | 'parrot-scientist' 
+  | 'parrot-cool' 
+  | 'parrot-vip' 
+  | 'parrot-explorer' 
+  | 'parrot-artist';
+
 export interface Alternative {
   id: 'A' | 'B' | 'C' | 'D' | 'E';
   text: string;

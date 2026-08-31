@@ -13,7 +13,8 @@ import {
   NotificationItem, 
   PlanId, 
   SubscriptionRequest, 
-  UserRole 
+  UserRole,
+  AvatarId
 } from '../types/chuplingo';
 import { COURSES, LEVEL_THRESHOLDS } from '../data/coursesData';
 import { INITIAL_CHALLENGES } from '../data/challengesData';
@@ -60,6 +61,7 @@ interface ChuplingoContextType {
   user: UserProfile;
   isAuthenticated: boolean;
   isOnline: boolean;
+  isDarkMode: boolean;
   sessions: PracticeSession[];
   favoriteQuestionIds: string[];
   mistakes: MistakeRecord[];
@@ -97,9 +99,11 @@ interface ChuplingoContextType {
   recordSession: (sessionData: Omit<PracticeSession, 'id' | 'userId' | 'fecha' | 'xpGanado'>) => Promise<PracticeSession>;
   toggleFavorite: (questionId: string) => boolean;
   isFavorite: (questionId: string) => boolean;
-  // Preferences & Plans
+  // Preferences, Avatar & Theme
   updateUserPreferences: (prefs: Partial<UserProfile['preferencias']>) => void;
   updateUserName: (name: string, lastName?: string) => void;
+  updateUserAvatar: (avatarId: AvatarId | string) => void;
+  toggleDarkMode: () => void;
   changeUserPlan: (planId: PlanId) => void;
   // Subscription Requests System (Yape manual + Storage)
   submitSubscriptionRequest: (params: {
@@ -206,7 +210,7 @@ const INITIAL_USER: UserProfile = {
   apellido: 'Chuplingo',
   email: 'estudiante@chuplingo.pe',
   emailVerificado: false,
-  avatar: 'parrot',
+  avatar: 'parrot-classic',
   creadoEn: new Date().toISOString(),
   suscripcion: {
     planId: 'gratis',
@@ -277,6 +281,19 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [courseQuestionCounts, setCourseQuestionCounts] = useState<Record<string, number>>({});
   const [topicQuestionCounts, setTopicQuestionCounts] = useState<Record<string, number>>({});
   const [userPendingRequest, setUserPendingRequest] = useState<SubscriptionRequest | null>(null);
+
+  const isDarkMode = !!user.preferencias?.temaOscuro;
+
+  // Apply dark class to document root
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, [isDarkMode]);
 
   const [sessions, setSessions] = useState<PracticeSession[]>(() => {
     try {
@@ -581,6 +598,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           id: userId,
           nombre: profile.first_name || prev.nombre,
           apellido: profile.last_name || prev.apellido,
+          avatar: profile.avatar_url || prev.avatar || 'parrot-classic',
           xp: profile.xp || 0,
           nivel: level,
           tituloNivel: title,
@@ -1528,6 +1546,21 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     toast.success('Preferencias guardadas');
   };
 
+  const toggleDarkMode = () => {
+    const newDarkMode = !isDarkMode;
+    updateUserPreferences({ temaOscuro: newDarkMode });
+    toast.success(newDarkMode ? '🌙 Modo Oscuro activado' : '☀️ Modo Claro activado');
+  };
+
+  const updateUserAvatar = (avatarId: AvatarId | string) => {
+    setUser(prev => ({ ...prev, avatar: avatarId }));
+    if (isAuthenticated && isValidUUID(user.id)) {
+      supabase.from('profiles').update({ avatar_url: avatarId, updated_at: new Date().toISOString() }).eq('id', user.id);
+    }
+    toast.success('Foto de perfil actualizada');
+    triggerConfetti();
+  };
+
   const updateUserName = (name: string, lastName?: string) => {
     if (!name.trim()) return;
     const finalLastName = lastName !== undefined ? lastName.trim() : user.apellido;
@@ -1912,6 +1945,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         user,
         isAuthenticated,
         isOnline,
+        isDarkMode,
         sessions,
         favoriteQuestionIds,
         mistakes,
@@ -1942,6 +1976,8 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isFavorite,
         updateUserPreferences,
         updateUserName,
+        updateUserAvatar,
+        toggleDarkMode,
         changeUserPlan,
         submitSubscriptionRequest,
         fetchAdminSubscriptionRequests,

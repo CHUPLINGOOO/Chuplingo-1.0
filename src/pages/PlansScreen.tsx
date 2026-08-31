@@ -47,7 +47,7 @@ const PlansScreen: React.FC = () => {
     e.preventDefault();
 
     if (!operationNumber.trim() && !phoneNumber.trim() && !proofFile) {
-      toast.error('Ingresa al menos el N° de Operación, tu número de teléfono o adjunta la captura');
+      toast.error('Ingresa al menos el N° de Operación o tu número de teléfono');
       return;
     }
 
@@ -81,21 +81,21 @@ const PlansScreen: React.FC = () => {
       />
 
       {/* Mascot & Active Status Card */}
-      <div className="mx-4 -mt-6 bg-white rounded-3xl p-5 shadow-sm border border-slate-100 relative z-20 flex items-center gap-4">
-        <ChuplingoMascot mood="celebrating" size="sm" />
+      <div className="mx-4 -mt-6 bg-white dark:bg-slate-800 rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-700 relative z-20 flex items-center gap-4">
+        <ChuplingoMascot mood="celebrating" avatarId={user.avatar} size="sm" />
         <div className="min-w-0 flex-1">
           <span className="text-[10px] font-black text-[#FF9418] uppercase tracking-wider block">
             Potencia tu aprendizaje
           </span>
-          <h2 className="text-sm font-black text-[#183153] leading-snug">
+          <h2 className="text-sm font-black text-[#183153] dark:text-white leading-snug">
             Plan actual: <span className="text-[#F05C54] uppercase">{user.suscripcion.planId}</span>
           </h2>
           {userPendingRequest && userPendingRequest.status === 'pendiente' ? (
-            <p className="text-[11px] text-amber-600 font-bold mt-1 flex items-center gap-1">
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 font-bold mt-1 flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" /> Solicitud Plan {userPendingRequest.plan} en revisión
             </p>
           ) : (
-            <p className="text-[11px] text-slate-500 mt-0.5">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
               Acceso a los 8 cursos preuniversitarios oficiales.
             </p>
           )}
@@ -104,11 +104,11 @@ const PlansScreen: React.FC = () => {
 
       {/* Pending Request Alert Badge */}
       {userPendingRequest && userPendingRequest.status === 'pendiente' && (
-        <div className="mx-4 bg-amber-50 border border-amber-200 p-3 rounded-2xl flex items-start gap-2.5 text-xs text-amber-900">
+        <div className="mx-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-3 rounded-2xl flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
           <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           <div>
             <span className="font-black block">Solicitud de suscripción pendiente</span>
-            <span className="text-[11px] text-amber-800">
+            <span className="text-[11px]">
               Estamos verificando tu pago Yape de S/ {userPendingRequest.price} para el Plan {userPendingRequest.plan}. En breve se activará tu cuenta.
             </span>
           </div>
@@ -128,7 +128,7 @@ const PlansScreen: React.FC = () => {
               className={`rounded-3xl p-5 transition-all relative overflow-hidden ${
                 isVIP
                   ? 'bg-gradient-to-br from-[#183153] via-[#244572] to-[#162C4E] text-white shadow-xl border-2 border-amber-400'
-                  : 'bg-white text-slate-900 border border-slate-200 shadow-sm'
+                  : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 shadow-sm'
               }`}
             >
               {/* Highlight ribbon */}
@@ -142,7 +142,7 @@ const PlansScreen: React.FC = () => {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className={`text-base font-black ${isVIP ? 'text-white' : 'text-[#183153]'}`}>
+                    <h3 className={`text-base font-black ${isVIP ? 'text-white' : 'text-[#183153] dark:text-white'}`}>
                       {plan.nombre}
                     </h3>
                     {plan.badge && (
@@ -154,7 +154,7 @@ const PlansScreen: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  <p className={`text-xs mt-0.5 font-medium ${isVIP ? 'text-slate-300' : 'text-slate-500'}`}>
+                  <p className={`text-xs mt-0.5 font-medium ${isVIP ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
                     {plan.subtitulo}
                   </p>
                 </div>
@@ -165,7 +165,7 @@ const PlansScreen: React.FC = () => {
                 <span className="text-3xl font-black">
                   S/ {plan.precio}
                 </span>
-                <span className={`text-xs font-bold ${isVIP ? 'text-slate-300' : 'text-slate-500'}`}>
+                <span className={`text-xs font-bold ${isVIP ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
                   {plan.precio === 0 ? 'para siempre' : `/${plan.periodo}`}
                 </span>
               </div>
@@ -180,7 +180,7 @@ const PlansScreen: React.FC = () => {
                     >
                       <Check className="w-2.5 h-2.5 stroke-[3]" />
                     </div>
-                    <span className={`leading-tight ${isVIP ? 'text-slate-200' : 'text-slate-700 font-medium'}`}>
+                    <span className={`leading-tight ${isVIP ? 'text-slate-200' : 'text-slate-700 dark:text-slate-300 font-medium'}`}>
                       {ben}
                     </span>
                   </div>
@@ -190,7 +190,7 @@ const PlansScreen: React.FC = () => {
               {/* CTA Action */}
               <div className="mt-5">
                 {isCurrent ? (
-                  <div className="w-full py-3 rounded-2xl bg-white/20 text-center text-xs font-black">
+                  <div className="w-full py-3 rounded-2xl bg-slate-100 dark:bg-slate-700 text-center text-xs font-black">
                     ✓ Tu plan actual
                   </div>
                 ) : isPendingThisPlan ? (
@@ -214,41 +214,42 @@ const PlansScreen: React.FC = () => {
         })}
       </div>
 
-      {/* Yape Checkout Modal */}
+      {/* Modern Yape Checkout Modal: Elevado arriba y con scroll optimizado */}
       {selectedPlanForModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center z-50 p-3 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-5 border border-slate-200 shadow-2xl flex flex-col gap-3.5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b pb-2">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-start justify-center z-50 p-4 pt-6 sm:pt-10 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-5 border border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col gap-3 my-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b dark:border-slate-800 pb-2.5">
               <div className="flex items-center gap-2">
-                <span className="text-xl">🦜</span>
+                <span className="text-2xl">🦜</span>
                 <div>
-                  <h3 className="text-sm font-black text-[#183153]">Pagar con Yape</h3>
-                  <p className="text-[11px] text-slate-500">Plan {selectedPlanForModal.nombre} (S/ {selectedPlanForModal.precio})</p>
+                  <h3 className="text-sm font-black text-[#183153] dark:text-white">Pagar con Yape</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Plan {selectedPlanForModal.nombre}</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedPlanForModal(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-300"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Yape instructions card */}
-            <div className="bg-purple-50 border border-purple-200 rounded-2xl p-3.5 flex flex-col gap-2 text-center text-purple-950">
-              <span className="text-xs font-bold text-purple-800">Yapea el monto exacto de:</span>
-              <span className="text-2xl font-black text-purple-900">S/ {selectedPlanForModal.precio}.00</span>
-              <div className="bg-white p-2 rounded-xl border border-purple-100 mt-1">
-                <span className="text-[11px] font-bold text-slate-500 block">Número de Yape Chuplingo:</span>
-                <span className="text-base font-black text-[#183153]">968 839 074</span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">Titular: Rufo H.</span>
+            <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-2xl p-3.5 flex flex-col gap-1.5 text-center text-purple-950 dark:text-purple-200">
+              <span className="text-xs font-bold text-purple-800 dark:text-purple-300">Yapea el monto exacto:</span>
+              <span className="text-3xl font-black text-purple-900 dark:text-purple-100">S/ {selectedPlanForModal.precio}.00</span>
+              <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-purple-100 dark:border-purple-900 mt-1 shadow-2xs">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Número de Yape Oficial:</span>
+                <span className="text-base font-black text-[#183153] dark:text-white tracking-wide">968 839 074</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5 font-medium">Titular: Rufo H.</span>
               </div>
             </div>
 
             {/* Form to submit proof */}
-            <form onSubmit={handleSendPaymentProof} className="flex flex-col gap-3">
+            <form onSubmit={handleSendPaymentProof} className="flex flex-col gap-2.5">
               <div>
-                <label className="text-[11px] font-black text-[#183153] uppercase tracking-wide block mb-1">
+                <label className="text-[11px] font-black text-[#183153] dark:text-slate-200 uppercase tracking-wide block mb-1">
                   Número de Operación Yape
                 </label>
                 <input
@@ -256,12 +257,12 @@ const PlansScreen: React.FC = () => {
                   placeholder="Ej: 14892018"
                   value={operationNumber}
                   onChange={(e) => setOperationNumber(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-[#183153]"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-[#183153] dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-black text-[#183153] uppercase tracking-wide block mb-1">
+                <label className="text-[11px] font-black text-[#183153] dark:text-slate-200 uppercase tracking-wide block mb-1">
                   Teléfono con el que yapeaste
                 </label>
                 <input
@@ -269,18 +270,18 @@ const PlansScreen: React.FC = () => {
                   placeholder="Ej: 999 888 777"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-[#183153]"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-[#183153] dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-black text-[#183153] uppercase tracking-wide block mb-1">
-                  Comprobante / Captura de Yape (Opcional)
+                <label className="text-[11px] font-black text-[#183153] dark:text-slate-200 uppercase tracking-wide block mb-1">
+                  Comprobante / Captura (Opcional)
                 </label>
-                <label className="border-2 border-dashed border-slate-200 hover:border-purple-400 rounded-xl p-3 text-center cursor-pointer flex flex-col items-center justify-center gap-1 bg-slate-50">
-                  <Upload className="w-5 h-5 text-slate-400" />
-                  <span className="text-xs font-bold text-slate-600">
-                    {proofFile ? proofFile.name : 'Subir captura de pantalla'}
+                <label className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-purple-400 rounded-xl p-2.5 text-center cursor-pointer flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800">
+                  <Upload className="w-4 h-4 text-purple-500" />
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate max-w-[200px]">
+                    {proofFile ? proofFile.name : 'Subir captura'}
                   </span>
                   <input
                     type="file"
@@ -291,12 +292,13 @@ const PlansScreen: React.FC = () => {
                 </label>
               </div>
 
+              {/* Botón de envío siempre visible y destacado */}
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3.5 rounded-2xl bg-[#7354D9] hover:bg-[#5F3EC9] disabled:opacity-60 text-white font-black text-xs shadow-md mt-2 flex items-center justify-center gap-1.5 transition-transform active:scale-95"
+                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#7354D9] to-[#9176EA] hover:from-[#603EC8] hover:to-[#7E61DD] disabled:opacity-60 text-white font-black text-xs shadow-lg mt-1 flex items-center justify-center gap-1.5 transition-transform active:scale-95"
               >
-                <span>{isSubmitting ? 'Enviando solicitud...' : 'Enviar Comprobante para Activación'}</span>
+                <span>{isSubmitting ? 'Enviando comprobante...' : 'Confirmar y Enviar Comprobante'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>

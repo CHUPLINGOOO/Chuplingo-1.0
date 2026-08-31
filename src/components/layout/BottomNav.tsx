@@ -17,7 +17,7 @@ export const BottomNav: React.FC = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white/95 backdrop-blur-md border-t border-slate-100 px-3 py-2 z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] sm:rounded-b-[32px]">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 px-3 py-2 z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] sm:rounded-b-[32px] transition-colors">
       <div className="flex items-center justify-around">
         {navItems.map((item) => {
           const isActive = 
@@ -35,7 +35,7 @@ export const BottomNav: React.FC = () => {
                 isActive ? 'scale-105' : 'opacity-65 hover:opacity-100'
               }`}
               style={{
-                color: isActive ? item.color : '#64748B'
+                color: isActive ? item.color : '#94A3B8'
               }}
             >
               <div 
@@ -48,13 +48,12 @@ export const BottomNav: React.FC = () => {
               >
                 <IconComponent className="w-5 h-5 transition-transform" strokeWidth={isActive ? 2.5 : 2} />
               </div>
-              <span className={`text-[11px] mt-0.5 tracking-tight ${isActive ? 'font-bold' : 'font-medium'}`}>
+              <span className={`text-[11px] mt-0.5 tracking-tight ${isActive ? 'font-black' : 'font-medium'}`}>
                 {item.label}
               </span>
               
-              {/* Notification dot on Desafíos if active daily quests exist */}
               {item.label === 'Desafíos' && claimedChallengeIds.length === 0 && (
-                <span className="absolute top-1.5 right-3 w-2 h-2 bg-[#FF9418] rounded-full animate-pulse ring-2 ring-white" />
+                <span className="absolute top-1.5 right-3 w-2 h-2 bg-[#FF9418] rounded-full animate-pulse ring-2 ring-white dark:ring-slate-900" />
               )}
             </button>
           );
