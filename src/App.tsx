@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ChuplingoProvider } from "./context/ChuplingoContext";
 import { MobileContainer } from "./components/layout/MobileContainer";
 import { BottomNav } from "./components/layout/BottomNav";
+import { NetworkStatusBanner } from "./components/common/NetworkStatusBanner";
 
 // Core Pages
 import Home from "./pages/Home";
@@ -56,6 +57,7 @@ const AppContent = () => {
 
   return (
     <MobileContainer hasBottomNav={!shouldHideBottomNav}>
+      <NetworkStatusBanner />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/welcome" element={<Welcome />} />

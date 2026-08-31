@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { COURSES } from '../data/coursesData';
 import { Question, QuestionAttempt, CourseId, PracticeMode } from '../types/chuplingo';
 import { useChuplingo } from '../context/ChuplingoContext';
-import { Star, ArrowRight, CheckCircle2, XCircle, Lightbulb, ArrowLeft, Timer, Sparkles, AlertTriangle } from 'lucide-react';
+import { Star, ArrowRight, CheckCircle2, XCircle, Lightbulb, ArrowLeft, Timer, Sparkles, AlertTriangle, RefreshCw, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PracticeQuestionScreen: React.FC = () => {
@@ -14,7 +14,8 @@ const PracticeQuestionScreen: React.FC = () => {
     toggleFavorite, 
     isFavorite, 
     recordSession, 
-    isLoadingQuestions 
+    isLoadingQuestions,
+    isOnline 
   } = useChuplingo();
 
   const courseParam = (searchParams.get('course') as CourseId) || 'literatura';
@@ -24,6 +25,7 @@ const PracticeQuestionScreen: React.FC = () => {
 
   const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const activeCourse = COURSES.find(c => c.id === courseParam) || COURSES[0];
 
@@ -35,16 +37,23 @@ const PracticeQuestionScreen: React.FC = () => {
   const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
   const [secondsRemaining, setSecondsRemaining] = useState<number>(modeParam === 'simulacro' ? 1500 : 0);
 
-  // Fetch session questions directly from Supabase with requested count & topic
-  useEffect(() => {
-    let isMounted = true;
-    const loadSession = async () => {
-      const questionsCount = 
-        modeParam === 'rapida' ? 10 :
-        modeParam === 'estandar' ? 20 :
-        modeParam === 'intensiva' ? 30 :
-        modeParam === 'simulacro' ? 25 : 10;
+  const loadSession = async () => {
+    setLoadError(null);
+    setHasLoaded(false);
 
+    if (!navigator.onLine) {
+      setLoadError('Se requiere conexión a Internet para cargar las preguntas desde Supabase.');
+      setHasLoaded(true);
+      return;
+    }
+
+    const questionsCount = 
+      modeParam === 'rapida' ? 10 :
+      modeParam === 'estandar' ? 20 :
+      modeParam === 'intensiva' ? 30 :
+      modeParam === 'simulacro' ? 25 : 10;
+
+    try {
       const questions = await fetchQuestionsForSession({
         courseId: courseParam,
         topicId: topicParam,
@@ -53,17 +62,20 @@ const PracticeQuestionScreen: React.FC = () => {
         count: questionsCount
       });
 
-      if (isMounted) {
+      if (questions && questions.length > 0) {
         setSessionQuestions(questions);
-        setHasLoaded(true);
+      } else {
+        setLoadError('No se encontraron preguntas en Supabase para este filtro.');
       }
-    };
+    } catch (e: any) {
+      setLoadError(`Error de conexión con Supabase: ${e?.message || 'Fallo de red'}`);
+    } finally {
+      setHasLoaded(true);
+    }
+  };
 
+  useEffect(() => {
     loadSession();
-
-    return () => {
-      isMounted = false;
-    };
   }, [courseParam, topicParam, modeParam, difficultyParam, fetchQuestionsForSession]);
 
   const currentQuestion = sessionQuestions[currentIndex];
@@ -94,26 +106,45 @@ const PracticeQuestionScreen: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#F7F8FC] flex flex-col items-center justify-center p-6 text-center">
         <Sparkles className="w-10 h-10 text-[#F05C54] animate-spin mb-3" />
-        <p className="text-sm font-black text-[#183153]">Cargando preguntas de Supabase...</p>
-        <p className="text-xs text-slate-400 mt-1">Conectando con el banco de preguntas</p>
+        <p className="text-sm font-black text-[#183153]">Conectando con Supabase...</p>
+        <p className="text-xs text-slate-400 mt-1">Descargando preguntas en vivo a través de Internet</p>
       </div>
     );
   }
 
-  if (!currentQuestion) {
+  if (loadError || !currentQuestion) {
     return (
       <div className="min-h-screen bg-[#F7F8FC] flex flex-col items-center justify-center p-6 text-center">
-        <AlertTriangle className="w-12 h-12 text-amber-500 mb-3" />
-        <h2 className="text-base font-black text-[#183153]">No se encontraron preguntas en Supabase</h2>
+        {!isOnline ? (
+          <WifiOff className="w-12 h-12 text-rose-500 mb-3 animate-pulse" />
+        ) : (
+          <AlertTriangle className="w-12 h-12 text-amber-500 mb-3" />
+        )}
+
+        <h2 className="text-base font-black text-[#183153]">
+          {!isOnline ? 'Sin conexión a Internet' : 'Preguntas no disponibles'}
+        </h2>
+
         <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
-          Verifica que la tabla <code>questions</code> contenga preguntas activas para {activeCourse.nombre}.
+          {loadError || 'La aplicación requiere conexión a Internet para descargar el banco de preguntas oficial desde Supabase.'}
         </p>
-        <button
-          onClick={() => navigate('/courses')}
-          className="mt-5 px-5 py-2.5 bg-[#183153] text-white rounded-2xl text-xs font-black"
-        >
-          Volver a Cursos
-        </button>
+
+        <div className="flex gap-2 mt-5">
+          <button
+            onClick={loadSession}
+            className="px-4 py-2.5 bg-[#F05C54] hover:bg-[#E04B43] text-white rounded-2xl text-xs font-black shadow-sm flex items-center gap-1.5 transition-transform active:scale-95"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Reintentar descarga</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/courses')}
+            className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-2xl text-xs font-bold transition-colors"
+          >
+            Volver a Cursos
+          </button>
+        </div>
       </div>
     );
   }
@@ -204,7 +235,7 @@ const PracticeQuestionScreen: React.FC = () => {
               {modeParam === 'simulacro' ? 'Simulacro de Admisión' : activeCourse.nombre}
             </span>
             <span className="text-[11px] text-slate-400 font-bold block">
-              Pregunta {currentIndex + 1} de {sessionQuestions.length}
+              Pregunta {currentIndex + 1} de {sessionQuestions.length} (Supabase Online)
             </span>
           </div>
 

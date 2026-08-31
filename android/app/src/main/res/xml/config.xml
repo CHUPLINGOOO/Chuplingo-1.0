@@ -1,10 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
-<widget id="com.chuplingo.app" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
-    <name>Chuplingo</name>
-    <description>Preparación Preuniversitaria Gamificada</description>
-    <author email="soporte@chuplingo.pe" href="https://chuplingo.pe">Chuplingo</author>
-    <content src="index.html"/>
-    <access origin="*"/>
-    <allow-navigation href="*"/>
-    <allow-intent href="*"/>
+<?xml version='1.0' encoding='utf-8'?>
+<widget version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+  <access origin="*" />
+  
+  
 </widget>

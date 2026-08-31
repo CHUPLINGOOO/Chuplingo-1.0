@@ -21,10 +21,12 @@ import { INITIAL_ACHIEVEMENTS } from '../data/achievementsData';
 import { supabase } from '../integrations/supabase/client';
 import { toast } from 'sonner';
 import { triggerConfetti } from '../utils/confetti';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 interface ChuplingoContextType {
   user: UserProfile;
   isAuthenticated: boolean;
+  isOnline: boolean;
   sessions: PracticeSession[];
   favoriteQuestionIds: string[];
   mistakes: MistakeRecord[];
@@ -209,6 +211,8 @@ const INITIAL_USER: UserProfile = {
 const ChuplingoContext = createContext<ChuplingoContextType | undefined>(undefined);
 
 export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isOnline } = useNetworkStatus();
+
   const [user, setUser] = useState<UserProfile>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.USER_STATS);
@@ -287,7 +291,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         {
           id: 'notif-welcome',
           titulo: '¡Bienvenido a Chuplingo!',
-          mensaje: 'Explora los 8 cursos y empieza a construir tu racha diaria.',
+          mensaje: 'Explora los 8 cursos y empieza a construir tu racha diaria en tiempo real.',
           tipo: 'sistema',
           leido: false,
           fecha: new Date().toISOString()
@@ -345,6 +349,11 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, []);
 
   const fetchQuestionsFromSupabase = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast.error('Sin conexión a Internet. Conéctate para actualizar el banco de preguntas.');
+      return;
+    }
+
     try {
       setIsLoadingQuestions(true);
 
@@ -356,6 +365,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       if (error) {
         console.error('[Supabase questions fetch error]', error);
+        toast.error('Error al conectar con la base de datos de preguntas de Supabase');
         return;
       }
 
@@ -401,17 +411,27 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     difficulty?: string;
     count?: number;
   }): Promise<Question[]> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast.error('Se requiere conexión a Internet para iniciar el test.');
+      return [];
+    }
+
     const targetCount = params.count || 10;
 
     if (params.mode === 'errores') {
       const mistakeIds = mistakes.filter(m => !m.dominada).map(m => m.questionId);
       if (mistakeIds.length === 0) return [];
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('questions')
         .select('*')
         .in('id', mistakeIds)
         .limit(targetCount);
+
+      if (error) {
+        console.error('[fetchQuestions error for errores]', error);
+        return [];
+      }
 
       if (data && data.length > 0) {
         return shuffleList(data.map(mapDbQuestion));
@@ -422,11 +442,16 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (params.mode === 'favoritos') {
       if (favoriteQuestionIds.length === 0) return [];
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('questions')
         .select('*')
         .in('id', favoriteQuestionIds)
         .limit(targetCount);
+
+      if (error) {
+        console.error('[fetchQuestions error for favoritos]', error);
+        return [];
+      }
 
       if (data && data.length > 0) {
         return shuffleList(data.map(mapDbQuestion));
@@ -435,16 +460,21 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
 
     if (params.mode === 'simulacro') {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('questions')
         .select('*')
         .eq('active', true)
-        .limit(Math.max(50, targetCount * 2));
+        .limit(Math.max(60, targetCount * 3));
+
+      if (error) {
+        console.error('[fetchQuestions error for simulacro]', error);
+        return [];
+      }
 
       if (data && data.length > 0) {
         return shuffleList(data.map(mapDbQuestion)).slice(0, targetCount);
       }
-      return allQuestions.slice(0, targetCount);
+      return [];
     }
 
     let query = supabase.from('questions').select('*').eq('active', true);
@@ -465,22 +495,16 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     if (error) {
       console.error('[fetchQuestionsForSession error]', error);
+      toast.error('Error al descargar preguntas en tiempo real');
+      return [];
     }
 
     if (data && data.length > 0) {
       return shuffleList(data.map(mapDbQuestion)).slice(0, targetCount);
     }
 
-    let localFiltered = [...allQuestions];
-    if (params.courseId) {
-      localFiltered = localFiltered.filter(q => q.courseId === params.courseId);
-    }
-    if (params.topicId && params.topicId !== 'all') {
-      localFiltered = localFiltered.filter(q => q.topicId === params.topicId);
-    }
-
-    return shuffleList(localFiltered).slice(0, targetCount);
-  }, [allQuestions, mistakes, favoriteQuestionIds, mapDbQuestion]);
+    return [];
+  }, [mistakes, favoriteQuestionIds, mapDbQuestion]);
 
   const loadUserDataFromSupabase = async (userId: string) => {
     if (!isValidUUID(userId)) return;
@@ -1128,7 +1152,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         ? authData.user.id 
         : (isValidUUID(user.id) ? user.id : null);
 
-      // 1. Update request status to 'approved'
       const { error: reqErr } = await supabase
         .from('subscription_requests')
         .update({
@@ -1144,7 +1167,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return false;
       }
 
-      // 2. Insert or update active subscription
       await supabase.from('subscriptions').upsert({
         user_id: targetUserId,
         plan: plan.toUpperCase(),
@@ -1155,13 +1177,11 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         provider: 'YAPE'
       }, { onConflict: 'user_id' });
 
-      // 3. Update target user profile plan
       await supabase.from('profiles').update({
         plan: plan.toUpperCase(),
         updated_at: new Date().toISOString()
       }).eq('id', targetUserId);
 
-      // If active user is the approved user, update memory
       if (user.id === targetUserId) {
         setUser(prev => ({
           ...prev,
@@ -1205,12 +1225,12 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       if (error) {
         console.error('[rejectSubscriptionRequest error]', error);
-        toast.error(`Error de Supabase al rechazar: ${error.message} (${error.code || ''})`);
+        toast.error(`Error de Supabase al rechazar: ${error.message}`);
         return false;
       }
 
       if (!data || data.length === 0) {
-        toast.error('No se pudo actualizar la solicitud (verifica si tu usuario tiene permisos de administrador).');
+        toast.error('No se pudo actualizar la solicitud.');
         return false;
       }
 
@@ -1849,6 +1869,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       value={{
         user,
         isAuthenticated,
+        isOnline,
         sessions,
         favoriteQuestionIds,
         mistakes,
