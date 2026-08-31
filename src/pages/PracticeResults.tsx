@@ -8,12 +8,11 @@ import {
   XCircle, 
   Clock, 
   Star, 
-  RotateCcw, 
   Play, 
   Home, 
   AlertCircle,
   Award,
-  ArrowRight 
+  BookOpen
 } from 'lucide-react';
 
 const PracticeResults: React.FC = () => {
@@ -25,10 +24,10 @@ const PracticeResults: React.FC = () => {
 
   if (!session) {
     return (
-      <div className="p-6 text-center">
-        <p className="text-sm font-bold text-slate-600">Sesión no encontrada</p>
+      <div className="min-h-screen bg-[#F7F8FC] dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
+        <p className="text-sm font-bold text-slate-600 dark:text-slate-300">Sesión no encontrada</p>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/', { replace: true })}
           className="mt-4 px-4 py-2 bg-[#F05C54] text-white rounded-xl text-xs font-bold"
         >
           Ir al Inicio
@@ -44,7 +43,7 @@ const PracticeResults: React.FC = () => {
   const timeFormatted = `${minutes}:${String(seconds).padStart(2, '0')}`;
 
   return (
-    <div className="min-h-screen bg-[#F7F8FC] flex flex-col justify-between pb-8">
+    <div className="min-h-screen bg-[#F7F8FC] dark:bg-slate-900 flex flex-col justify-between pb-8 transition-colors">
       {/* Top Banner */}
       <div className="bg-gradient-to-b from-[#183153] to-[#254A7A] text-white pt-8 pb-12 px-6 rounded-b-[36px] text-center relative overflow-hidden">
         <div className="relative z-10 flex flex-col items-center">
@@ -71,48 +70,48 @@ const PracticeResults: React.FC = () => {
 
       {/* Stats Breakdown Card */}
       <div className="px-4 -mt-6 relative z-20">
-        <div className="bg-white rounded-2xl p-4 shadow-md border border-slate-100 grid grid-cols-3 gap-2 text-center">
-          <div className="p-2.5 rounded-xl bg-emerald-50">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-md border border-slate-100 dark:border-slate-700 grid grid-cols-3 gap-2 text-center">
+          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 mx-auto mb-1" />
-            <span className="text-lg font-black text-emerald-700 block leading-none">
+            <span className="text-lg font-black text-emerald-700 dark:text-emerald-300 block leading-none">
               {session.correctas}
             </span>
-            <span className="text-[10px] font-bold text-emerald-600 uppercase">
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">
               Correctas
             </span>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-rose-50">
+          <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60">
             <XCircle className="w-4 h-4 text-rose-600 mx-auto mb-1" />
-            <span className="text-lg font-black text-rose-700 block leading-none">
+            <span className="text-lg font-black text-rose-700 dark:text-rose-300 block leading-none">
               {session.incorrectas}
             </span>
-            <span className="text-[10px] font-bold text-rose-600 uppercase">
+            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase">
               Incorrectas
             </span>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-amber-50">
+          <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60">
             <Star className="w-4 h-4 text-amber-500 mx-auto mb-1 fill-amber-400" />
-            <span className="text-lg font-black text-amber-700 block leading-none">
+            <span className="text-lg font-black text-amber-700 dark:text-amber-300 block leading-none">
               +{session.xpGanado}
             </span>
-            <span className="text-[10px] font-bold text-amber-600 uppercase">
+            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase">
               XP ganado
             </span>
           </div>
         </div>
 
         {/* Time and Total Info */}
-        <div className="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 mt-3 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2 text-slate-500 font-semibold">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-3.5 shadow-sm border border-slate-100 dark:border-slate-700 mt-3 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-semibold">
             <Clock className="w-4 h-4 text-slate-400" />
-            <span>Tiempo empleado: <strong className="text-[#183153]">{timeFormatted}</strong></span>
+            <span>Tiempo empleado: <strong className="text-[#183153] dark:text-white">{timeFormatted}</strong></span>
           </div>
 
-          <div className="flex items-center gap-1 text-slate-500 font-semibold">
+          <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-semibold">
             <Award className="w-4 h-4 text-purple-500" />
-            <span>Nivel actual: <strong className="text-[#183153]">{user.nivel}</strong></span>
+            <span>Nivel actual: <strong className="text-[#183153] dark:text-white">{user.nivel}</strong></span>
           </div>
         </div>
       </div>
@@ -122,7 +121,7 @@ const PracticeResults: React.FC = () => {
         {session.incorrectas > 0 && (
           <button
             onClick={() => navigate('/mistakes')}
-            className="w-full py-3.5 px-4 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold text-xs flex items-center justify-center gap-2 border border-rose-200 transition-transform active:scale-95"
+            className="w-full py-3.5 px-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-700 dark:text-rose-300 font-extrabold text-xs flex items-center justify-center gap-2 border border-rose-200 dark:border-rose-900 transition-transform active:scale-95 cursor-pointer"
           >
             <AlertCircle className="w-4 h-4" />
             <span>Revisar {session.incorrectas} errores cometidos</span>
@@ -130,8 +129,8 @@ const PracticeResults: React.FC = () => {
         )}
 
         <button
-          onClick={() => navigate(`/practice-setup/${session.courseId}/${session.topicId || ''}`)}
-          className="w-full py-4 px-4 rounded-2xl text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
+          onClick={() => navigate(`/practice-setup/${session.courseId || 'literatura'}/${session.topicId || ''}`, { replace: true })}
+          className="w-full py-4 px-4 rounded-2xl text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer"
           style={{ backgroundColor: course.colorHex }}
         >
           <Play className="w-4 h-4 fill-white" />
@@ -139,10 +138,18 @@ const PracticeResults: React.FC = () => {
         </button>
 
         <button
-          onClick={() => navigate('/')}
-          className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-50 text-[#183153] font-black text-xs border border-slate-200 flex items-center justify-center gap-2 transition-transform active:scale-95"
+          onClick={() => navigate('/courses', { replace: true })}
+          className="w-full py-3 px-4 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-[#183153] dark:text-white font-black text-xs border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer"
         >
-          <Home className="w-4 h-4 text-slate-500" />
+          <BookOpen className="w-4 h-4 text-slate-400" />
+          <span>Volver a Mis Cursos</span>
+        </button>
+
+        <button
+          onClick={() => navigate('/', { replace: true })}
+          className="w-full py-3 px-4 rounded-2xl bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+        >
+          <Home className="w-4 h-4" />
           <span>Ir al Inicio</span>
         </button>
       </div>

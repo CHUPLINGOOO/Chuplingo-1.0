@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { COURSES } from '../data/coursesData';
 import { Question, QuestionAttempt, CourseId, PracticeMode } from '../types/chuplingo';
@@ -16,7 +16,8 @@ import {
   RefreshCw, 
   WifiOff, 
   Database,
-  GraduationCap
+  GraduationCap,
+  ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -54,7 +55,7 @@ const PracticeQuestionScreen: React.FC = () => {
   const [secondsRemaining, setSecondsRemaining] = useState<number>(modeParam === 'simulacro' ? 1500 : 0);
   const [showExitModal, setShowExitModal] = useState(false);
 
-  const loadSession = async () => {
+  const loadSession = useCallback(async () => {
     setLoadError(null);
     setHasLoaded(false);
 
@@ -80,11 +81,22 @@ const PracticeQuestionScreen: React.FC = () => {
       setLoadError(result.error || supabaseErrorMessage || 'No se encontraron preguntas en Supabase.');
     }
     setHasLoaded(true);
-  };
+  }, [courseParam, topicParam, modeParam, difficultyParam, universityParam, fetchQuestionsForSession, supabaseErrorMessage]);
 
   useEffect(() => {
     loadSession();
-  }, [courseParam, topicParam, modeParam, difficultyParam, universityParam, fetchQuestionsForSession]);
+  }, [loadSession]);
+
+  // Tecla Escape para abrir/cerrar modal de salida
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowExitModal(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const currentQuestion = sessionQuestions[currentIndex];
   const isLastQuestion = currentIndex === sessionQuestions.length - 1;
@@ -110,17 +122,29 @@ const PracticeQuestionScreen: React.FC = () => {
     setIsAnswerLocked(false);
   }, [currentIndex]);
 
-  const handleExitConfirm = () => {
+  const handleExitToHome = () => {
     setShowExitModal(false);
-    navigate('/');
+    navigate('/', { replace: true });
+  };
+
+  const handleExitToCourses = () => {
+    setShowExitModal(false);
+    navigate(`/courses/${courseParam}`, { replace: true });
   };
 
   if (isLoadingQuestions || !hasLoaded) {
     return (
       <div className="min-h-screen bg-[#F7F8FC] dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
         <Sparkles className="w-10 h-10 text-[#F05C54] animate-spin mb-3" />
-        <p className="text-sm font-black text-[#183153] dark:text-white">Consultando Supabase...</p>
-        <p className="text-xs text-slate-400 mt-1">Descargando preguntas de admisión en vivo</p>
+        <p className="text-sm font-black text-[#183153] dark:text-white">Consultando preguntas...</p>
+        <p className="text-xs text-slate-400 mt-1">Preparando tu sesión académica</p>
+        <button
+          onClick={() => navigate('/', { replace: true })}
+          className="mt-5 text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Cancelar y volver al inicio</span>
+        </button>
       </div>
     );
   }
@@ -135,29 +159,36 @@ const PracticeQuestionScreen: React.FC = () => {
         )}
 
         <h2 className="text-base font-black text-[#183153] dark:text-white">
-          {!isOnline ? 'Sin conexión a Internet' : 'Estado de Supabase'}
+          {!isOnline ? 'Sin conexión a Internet' : 'Aviso de Preguntas'}
         </h2>
 
         <div className="bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 rounded-2xl p-3.5 mt-2 max-w-xs text-left">
           <p className="text-[11px] text-rose-800 dark:text-rose-200 font-medium leading-relaxed">
-            {loadError || supabaseErrorMessage || 'No se pudieron recuperar las preguntas desde Supabase.'}
+            {loadError || supabaseErrorMessage || 'No se pudieron recuperar las preguntas para esta configuración.'}
           </p>
         </div>
 
         <div className="flex flex-col gap-2 mt-5 w-full max-w-xs">
           <button
             onClick={loadSession}
-            className="w-full py-3.5 bg-[#F05C54] hover:bg-[#E04B43] text-white rounded-2xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
+            className="w-full py-3.5 bg-[#F05C54] hover:bg-[#E04B43] text-white rounded-2xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" />
-            <span>Reintentar conexión con Supabase</span>
+            <span>Reintentar</span>
           </button>
 
           <button
-            onClick={() => navigate('/courses')}
-            className="w-full py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-bold transition-colors"
+            onClick={() => navigate('/courses', { replace: true })}
+            className="w-full py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-bold transition-colors cursor-pointer"
           >
             Volver a Cursos
+          </button>
+
+          <button
+            onClick={() => navigate('/', { replace: true })}
+            className="w-full py-2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+          >
+            Ir al Inicio
           </button>
         </div>
       </div>
@@ -214,7 +245,7 @@ const PracticeQuestionScreen: React.FC = () => {
         attempts
       });
 
-      navigate(`/results/${newSession.id}`);
+      navigate(`/results/${newSession.id}`, { replace: true });
     } else {
       setCurrentIndex(prev => prev + 1);
     }
@@ -231,11 +262,12 @@ const PracticeQuestionScreen: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F7F8FC] dark:bg-slate-900 flex flex-col justify-between select-none transition-colors">
-      {/* Dialogo Moderno de Salida */}
+      {/* Dialogo Moderno de Escape */}
       <ExitPracticeDialog
         isOpen={showExitModal}
         onContinue={() => setShowExitModal(false)}
-        onExit={handleExitConfirm}
+        onExitHome={handleExitToHome}
+        onExitCourses={handleExitToCourses}
         answeredCount={currentIndex}
         totalCount={sessionQuestions.length}
       />
@@ -243,15 +275,15 @@ const PracticeQuestionScreen: React.FC = () => {
       {/* Top Header & Progress Bar */}
       <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 pt-4 pb-3 border-b border-slate-100 dark:border-slate-800 shadow-xs sticky top-0 z-30 transition-colors">
         <div className="flex items-center justify-between mb-2">
-          {/* Botón de escape moderno con salida garantizada */}
+          {/* Botón de escape directo */}
           <button
             type="button"
             onClick={() => setShowExitModal(true)}
-            className="w-9 h-9 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 hover:text-rose-600 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors shadow-2xs active:scale-90"
-            title="Pausar o salir del test"
+            className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 hover:text-rose-600 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors shadow-2xs active:scale-90 cursor-pointer"
+            title="Salir del test (Esc)"
             aria-label="Salir de la práctica"
           >
-            <X className="w-4 h-4 stroke-[2.5]" />
+            <X className="w-5 h-5 stroke-[2.5]" />
           </button>
 
           <div className="text-center flex flex-col items-center">
@@ -272,7 +304,7 @@ const PracticeQuestionScreen: React.FC = () => {
             )}
             <button
               onClick={() => toggleFavorite(currentQuestion.id)}
-              className={`w-9 h-9 rounded-2xl flex items-center justify-center transition-all active:scale-90 ${
+              className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all active:scale-90 cursor-pointer ${
                 isCurrentFavorite 
                   ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 shadow-xs ring-2 ring-amber-200 dark:ring-amber-800' 
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-amber-500'
@@ -300,7 +332,6 @@ const PracticeQuestionScreen: React.FC = () => {
       <div className="p-4 flex-1 flex flex-col gap-3.5 max-w-[430px] mx-auto w-full">
         {/* Metadata Chips: Universidad y Tema */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Badge Oficial Universidad (UNMSM, UNI, UNSA, UNFV, UNSAAC) */}
           <span className="inline-flex items-center gap-1.5 text-[11px] font-black px-3 py-1 rounded-xl bg-[#183153] dark:bg-slate-800 text-white shadow-xs border border-slate-700/50">
             <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
             <span>{currentQuestion.fuente || 'UNMSM 2024-I'}</span>
@@ -354,7 +385,7 @@ const PracticeQuestionScreen: React.FC = () => {
                 key={alt.id}
                 disabled={isAnswerLocked}
                 onClick={() => handleSelectOption(alt.id)}
-                className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all active:scale-[0.99] ${optionStyle}`}
+                className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all active:scale-[0.99] cursor-pointer ${optionStyle}`}
               >
                 <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 transition-colors shadow-2xs ${badgeStyle}`}>
                   {alt.id}
@@ -406,7 +437,7 @@ const PracticeQuestionScreen: React.FC = () => {
           {isAnswerLocked ? (
             <button
               onClick={handleNext}
-              className="w-full py-4 px-6 rounded-2xl text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
+              className="w-full py-4 px-6 rounded-2xl text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer"
               style={{ backgroundColor: activeCourse.colorHex }}
             >
               <span>{isLastQuestion ? 'Finalizar y Ver Resultados 🎉' : 'Siguiente pregunta'}</span>

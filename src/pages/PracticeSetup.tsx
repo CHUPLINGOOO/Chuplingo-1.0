@@ -114,6 +114,7 @@ const PracticeSetup: React.FC = () => {
         subtitle="Elige universidad, curso y modalidad"
         iconEmoji="🎯"
         showBack={true}
+        fallbackRoute="/courses"
         bgGradient={activeCourse.bgGradient}
       />
 
@@ -306,7 +307,7 @@ const PracticeSetup: React.FC = () => {
         <div className="pt-2 pb-2">
           <button
             onClick={handleStart}
-            className="w-full py-4 px-6 rounded-2xl text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
+            className="w-full py-4 px-6 rounded-2xl text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer"
             style={{ backgroundColor: activeCourse.colorHex }}
           >
             <span>Iniciar Práctica Ahora</span>
