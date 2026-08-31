@@ -2,69 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/layout/AppHeader';
 import { useChuplingo } from '../context/ChuplingoContext';
-import { Bell, Flame, Trophy, Award, Sparkles, Trash2, ArrowRight } from 'lucide-react';
-
-const NOTIF_ICONS = {
-  racha: Flame,
-  desafio: Trophy,
-  logro: Award,
-  sistema: Sparkles,
-  suscripcion: Bell
-};
-
-const NotificationsCenter: React.FC = () => {
-  const navigate = useNavigate();
-  const { notifications, markNotificationAsRead, clearAllNotifications, user } = useChuplingo();
-
-  const missingToday = Math.max(0, user.preferencias.metaDiaria - user.preguntasRespondidasHoy);
-
-  return (
-    <div className="flex flex-col gap-4">
-      <AppHeader
-        title="Centro de Avisos"
-        subtitle="Recordatorios de racha y metas de estudio"
-        iconEmoji="🔔"
-        showBack={true}
-        bgGradient="from-[#183153] to-[#254A7A]"
-        rightAction={
-          notifications.length > 0 ? (
-            <button
-              onClick={clearAllNotifications}
-              className="text-xs font-bold text-white/80 hover:text-white flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Limpiar</span>
-            </button>
-          ) : undefined
-        }
-      />
-
-      {/* Racha Radar Banner */}
-      <div className="mx-4 -mt-2 bg-gradient-to-r from-[#FF5722] to-[#FF9418] rounded-3xl p-4 text-white shadow-sm flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-            <Flame className="w-6 h-6 fill-white" />
-          </div>
-          <div>
-            <h4 className="text-xs font-black uppercase tracking-wider text-amber-200">
-              Estado de tu Racha
-            </h4>
-            <p className="text-sm font-black mt-0.5">
-              {missingToday === 0 
-                ? `🔥 ¡Racha de ${user.rachaActual} días asegurada hoy!` 
-                : `Te faltan ${missingToday} preguntas hoy`}
-            </p>
-          </div>
-        </div>
-
-        {missingToday > 0 && (
-          <button
-            <dyad-write path="src/pages/NotificationsCenter.tsx" description="Centro de Notificaciones creativo con avisos de racha en riesgo y simulacros">
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AppHeader } from '../components/layout/AppHeader';
-import { useChuplingo } from '../context/ChuplingoContext';
-import { Bell, Flame, Trophy, Award, Sparkles, Trash2, ArrowRight, Play } from 'lucide-react';
+import { Bell, Flame, Trophy, Award, Sparkles, Trash2, Play } from 'lucide-react';
 
 const NOTIF_ICONS = {
   racha: Flame,
