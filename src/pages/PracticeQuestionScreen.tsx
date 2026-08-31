@@ -16,8 +16,7 @@ import {
   RefreshCw, 
   WifiOff, 
   Database,
-  GraduationCap,
-  Award
+  GraduationCap
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -31,7 +30,6 @@ const PracticeQuestionScreen: React.FC = () => {
     recordSession, 
     isLoadingQuestions,
     isOnline,
-    supabaseStatus,
     supabaseErrorMessage 
   } = useChuplingo();
 
@@ -112,11 +110,16 @@ const PracticeQuestionScreen: React.FC = () => {
     setIsAnswerLocked(false);
   }, [currentIndex]);
 
+  const handleExitConfirm = () => {
+    setShowExitModal(false);
+    navigate('/');
+  };
+
   if (isLoadingQuestions || !hasLoaded) {
     return (
-      <div className="min-h-screen bg-[#F7F8FC] flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-[#F7F8FC] dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
         <Sparkles className="w-10 h-10 text-[#F05C54] animate-spin mb-3" />
-        <p className="text-sm font-black text-[#183153]">Consultando Supabase...</p>
+        <p className="text-sm font-black text-[#183153] dark:text-white">Consultando Supabase...</p>
         <p className="text-xs text-slate-400 mt-1">Descargando preguntas de admisión en vivo</p>
       </div>
     );
@@ -124,19 +127,19 @@ const PracticeQuestionScreen: React.FC = () => {
 
   if (loadError || !currentQuestion) {
     return (
-      <div className="min-h-screen bg-[#F7F8FC] flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-[#F7F8FC] dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
         {!isOnline ? (
           <WifiOff className="w-12 h-12 text-rose-500 mb-3 animate-pulse" />
         ) : (
           <Database className="w-12 h-12 text-[#F05C54] mb-3" />
         )}
 
-        <h2 className="text-base font-black text-[#183153]">
+        <h2 className="text-base font-black text-[#183153] dark:text-white">
           {!isOnline ? 'Sin conexión a Internet' : 'Estado de Supabase'}
         </h2>
 
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 mt-2 max-w-xs text-left">
-          <p className="text-[11px] text-rose-800 font-medium leading-relaxed">
+        <div className="bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 rounded-2xl p-3.5 mt-2 max-w-xs text-left">
+          <p className="text-[11px] text-rose-800 dark:text-rose-200 font-medium leading-relaxed">
             {loadError || supabaseErrorMessage || 'No se pudieron recuperar las preguntas desde Supabase.'}
           </p>
         </div>
@@ -152,7 +155,7 @@ const PracticeQuestionScreen: React.FC = () => {
 
           <button
             onClick={() => navigate('/courses')}
-            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-xs font-bold transition-colors"
+            className="w-full py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-bold transition-colors"
           >
             Volver a Cursos
           </button>
@@ -227,43 +230,42 @@ const PracticeQuestionScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7F8FC] flex flex-col justify-between select-none">
+    <div className="min-h-screen bg-[#F7F8FC] dark:bg-slate-900 flex flex-col justify-between select-none transition-colors">
       {/* Dialogo Moderno de Salida */}
       <ExitPracticeDialog
         isOpen={showExitModal}
         onContinue={() => setShowExitModal(false)}
-        onExit={() => {
-          setShowExitModal(false);
-          navigate(-1);
-        }}
+        onExit={handleExitConfirm}
         answeredCount={currentIndex}
         totalCount={sessionQuestions.length}
       />
 
       {/* Top Header & Progress Bar */}
-      <div className="bg-white/95 backdrop-blur-md px-4 pt-4 pb-3 border-b border-slate-100 shadow-xs sticky top-0 z-30">
+      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 pt-4 pb-3 border-b border-slate-100 dark:border-slate-800 shadow-xs sticky top-0 z-30 transition-colors">
         <div className="flex items-center justify-between mb-2">
-          {/* Botón de escape moderno */}
+          {/* Botón de escape moderno con salida garantizada */}
           <button
+            type="button"
             onClick={() => setShowExitModal(true)}
-            className="w-9 h-9 rounded-2xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 flex items-center justify-center text-slate-600 transition-colors shadow-2xs active:scale-90"
+            className="w-9 h-9 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 hover:text-rose-600 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors shadow-2xs active:scale-90"
             title="Pausar o salir del test"
+            aria-label="Salir de la práctica"
           >
             <X className="w-4 h-4 stroke-[2.5]" />
           </button>
 
           <div className="text-center flex flex-col items-center">
-            <span className="text-xs font-black text-[#183153] tracking-tight">
+            <span className="text-xs font-black text-[#183153] dark:text-white tracking-tight">
               {modeParam === 'simulacro' ? 'Simulacro de Admisión' : activeCourse.nombre}
             </span>
-            <span className="text-[11px] text-slate-400 font-bold">
+            <span className="text-[11px] text-slate-400 dark:text-slate-400 font-bold">
               Pregunta {currentIndex + 1} de {sessionQuestions.length}
             </span>
           </div>
 
           <div className="flex items-center gap-1.5">
             {modeParam === 'simulacro' && (
-              <div className="flex items-center gap-1 bg-purple-50 text-[#7354D9] px-2.5 py-1 rounded-xl text-xs font-black border border-purple-100">
+              <div className="flex items-center gap-1 bg-purple-50 dark:bg-purple-950 text-[#7354D9] dark:text-purple-300 px-2.5 py-1 rounded-xl text-xs font-black border border-purple-100 dark:border-purple-900">
                 <Timer className="w-3.5 h-3.5" />
                 <span>{formatTimer(secondsRemaining)}</span>
               </div>
@@ -272,8 +274,8 @@ const PracticeQuestionScreen: React.FC = () => {
               onClick={() => toggleFavorite(currentQuestion.id)}
               className={`w-9 h-9 rounded-2xl flex items-center justify-center transition-all active:scale-90 ${
                 isCurrentFavorite 
-                  ? 'bg-amber-100 text-amber-600 shadow-xs ring-2 ring-amber-200' 
-                  : 'bg-slate-100 text-slate-400 hover:text-amber-500'
+                  ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 shadow-xs ring-2 ring-amber-200 dark:ring-amber-800' 
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-amber-500'
               }`}
               title="Guardar pregunta"
             >
@@ -283,7 +285,7 @@ const PracticeQuestionScreen: React.FC = () => {
         </div>
 
         {/* Dynamic Colorful Progress Bar */}
-        <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden p-0.5">
+        <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5">
           <div 
             className="h-full rounded-full transition-all duration-300 shadow-xs"
             style={{ 
@@ -299,7 +301,7 @@ const PracticeQuestionScreen: React.FC = () => {
         {/* Metadata Chips: Universidad y Tema */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Badge Oficial Universidad (UNMSM, UNI, UNSA, UNFV, UNSAAC) */}
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-black px-3 py-1 rounded-xl bg-[#183153] text-white shadow-xs">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-black px-3 py-1 rounded-xl bg-[#183153] dark:bg-slate-800 text-white shadow-xs border border-slate-700/50">
             <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
             <span>{currentQuestion.fuente || 'UNMSM 2024-I'}</span>
           </span>
@@ -311,14 +313,14 @@ const PracticeQuestionScreen: React.FC = () => {
             {currentQuestion.topicName || activeCourse.nombre}
           </span>
 
-          <span className="text-[10px] font-black px-2 py-1 rounded-xl bg-slate-100 text-slate-700 capitalize border border-slate-200">
+          <span className="text-[10px] font-black px-2 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 capitalize border border-slate-200 dark:border-slate-700">
             Nivel {currentQuestion.dificultad}
           </span>
         </div>
 
         {/* Question Enunciation Card */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 transition-all">
-          <h2 className="text-sm sm:text-base font-black text-[#183153] leading-relaxed">
+        <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-700/80 transition-all">
+          <h2 className="text-sm sm:text-base font-black text-[#183153] dark:text-white leading-relaxed">
             {currentQuestion.pregunta}
           </h2>
         </div>
@@ -329,22 +331,22 @@ const PracticeQuestionScreen: React.FC = () => {
             const isSelected = selectedAnswer === alt.id;
             const isCorrect = alt.id === currentQuestion.respuestaCorrecta;
 
-            let optionStyle = 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-800 shadow-2xs';
-            let badgeStyle = 'bg-slate-100 text-slate-700';
+            let optionStyle = 'bg-white dark:bg-[#1E293B] border-slate-200/90 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-200 shadow-2xs';
+            let badgeStyle = 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
 
             if (isAnswerLocked) {
               if (isCorrect) {
-                optionStyle = 'bg-emerald-50/90 border-2 border-emerald-500 text-emerald-950 font-black shadow-sm';
+                optionStyle = 'bg-emerald-50/90 dark:bg-emerald-950/70 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-200 font-black shadow-sm';
                 badgeStyle = 'bg-emerald-500 text-white font-black';
               } else if (isSelected && !isCorrect) {
-                optionStyle = 'bg-rose-50/90 border-2 border-rose-500 text-rose-950 font-black shadow-sm';
+                optionStyle = 'bg-rose-50/90 dark:bg-rose-950/70 border-2 border-rose-500 text-rose-950 dark:text-rose-200 font-black shadow-sm';
                 badgeStyle = 'bg-rose-500 text-white font-black';
               } else {
-                optionStyle = 'bg-slate-50/60 border-slate-100 text-slate-400 opacity-55';
+                optionStyle = 'bg-slate-50/60 dark:bg-slate-900/60 border-slate-100 dark:border-slate-800 text-slate-400 opacity-55';
               }
             } else if (isSelected) {
-              optionStyle = 'bg-white border-2 shadow-md';
-              badgeStyle = 'bg-[#183153] text-white';
+              optionStyle = 'bg-white dark:bg-[#1E293B] border-2 shadow-md';
+              badgeStyle = 'bg-[#183153] dark:bg-purple-600 text-white';
             }
 
             return (
@@ -369,8 +371,8 @@ const PracticeQuestionScreen: React.FC = () => {
         {isAnswerLocked && (
           <div className={`p-4 rounded-3xl border animate-in fade-in slide-in-from-bottom-2 duration-200 shadow-xs ${
             selectedAnswer === currentQuestion.respuestaCorrecta
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              : 'bg-rose-50 border-rose-200 text-rose-900'
+              ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200'
+              : 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200'
           }`}>
             <div className="flex items-center gap-2 mb-1 font-black text-sm">
               {selectedAnswer === currentQuestion.respuestaCorrecta ? (
@@ -387,8 +389,8 @@ const PracticeQuestionScreen: React.FC = () => {
             </div>
 
             {currentQuestion.explicacion && (
-              <div className="mt-2 text-xs leading-relaxed text-slate-700 bg-white/80 p-3 rounded-2xl border border-white/60">
-                <strong className="block text-[#183153] mb-1 flex items-center gap-1 font-black">
+              <div className="mt-2 text-xs leading-relaxed text-slate-700 dark:text-slate-200 bg-white/80 dark:bg-slate-900/80 p-3 rounded-2xl border border-white/60 dark:border-slate-800">
+                <strong className="block text-[#183153] dark:text-white mb-1 flex items-center gap-1 font-black">
                   <Lightbulb className="w-3.5 h-3.5 text-amber-500" /> Fundamentación académica:
                 </strong>
                 {currentQuestion.explicacion}
@@ -399,7 +401,7 @@ const PracticeQuestionScreen: React.FC = () => {
       </div>
 
       {/* Bottom Floating Bar */}
-      <div className="p-4 bg-white/95 backdrop-blur-md border-t border-slate-100 sticky bottom-0 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+      <div className="p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 sticky bottom-0 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] transition-colors">
         <div className="max-w-[430px] mx-auto">
           {isAnswerLocked ? (
             <button
@@ -411,7 +413,7 @@ const PracticeQuestionScreen: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
           ) : (
-            <div className="text-center py-2 text-xs font-bold text-slate-400 flex items-center justify-center gap-1.5">
+            <div className="text-center py-2 text-xs font-bold text-slate-400 dark:text-slate-400 flex items-center justify-center gap-1.5">
               <span>Toca una alternativa para validar</span>
             </div>
           )}

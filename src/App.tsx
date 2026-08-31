@@ -96,7 +96,14 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ChuplingoProvider>
       <TooltipProvider>
-        <Sonner position="top-center" />
+        {/* visibleToasts={1} y duration={2500} previene que se acumulen ventanas emergentes de golpe */}
+        <Sonner 
+          position="top-center" 
+          visibleToasts={1} 
+          duration={2500} 
+          richColors 
+          closeButton 
+        />
         <BrowserRouter>
           <AppContent />
         </BrowserRouter>

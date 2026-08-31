@@ -28,43 +28,43 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge }) => {
   const IconComponent = CHALLENGE_ICONS[challenge.icono] || Target;
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col gap-3 transition-all hover:shadow-md">
+    <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/80 flex flex-col gap-3 transition-all hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
         {/* Left Icon */}
-        <div className="w-12 h-12 rounded-2xl bg-orange-50 text-[#FF9418] flex items-center justify-center shrink-0 shadow-sm">
+        <div className="w-12 h-12 rounded-2xl bg-orange-50 dark:bg-orange-950/60 text-[#FF9418] flex items-center justify-center shrink-0 shadow-sm">
           <IconComponent className="w-6 h-6" />
         </div>
 
         {/* Center Details */}
         <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-black text-[#183153] leading-snug">
+          <h4 className="text-sm font-black text-[#183153] dark:text-white leading-snug">
             {challenge.titulo}
           </h4>
-          <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+          <p className="text-xs text-slate-500 dark:text-slate-300 mt-0.5 leading-relaxed font-medium">
             {challenge.descripcion}
           </p>
         </div>
 
         {/* Right XP Reward badge */}
         <div className="shrink-0 text-right">
-          <span className="inline-block font-black text-xs px-2.5 py-1 rounded-xl bg-amber-100 text-amber-800 border border-amber-200">
+          <span className="inline-block font-black text-xs px-2.5 py-1 rounded-xl bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
             +{challenge.recompensaXP} XP
           </span>
         </div>
       </div>
 
       {/* Progress & Actions */}
-      <div className="pt-2 border-t border-slate-100/90 flex flex-col gap-2">
+      <div className="pt-2 border-t border-slate-100/90 dark:border-slate-700/60 flex flex-col gap-2">
         <div className="flex items-center justify-between text-xs">
-          <span className="font-bold text-slate-500">
+          <span className="font-bold text-slate-500 dark:text-slate-400">
             {current} / {max} {challenge.tipo === 'accuracy_target' ? '%' : ''}
           </span>
-          <span className="font-bold text-slate-400">
+          <span className="font-bold text-slate-400 dark:text-slate-400">
             {percent}%
           </span>
         </div>
 
-        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden">
           <div 
             className="h-full rounded-full bg-gradient-to-r from-[#FF9418] to-[#F05C54] transition-all duration-500"
             style={{ width: `${percent}%` }}
@@ -73,13 +73,13 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ challenge }) => {
 
         <div className="flex justify-end pt-1">
           {claimed ? (
-            <span className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-xl inline-flex items-center gap-1">
+            <span className="text-xs font-bold text-slate-400 dark:text-slate-300 bg-slate-100 dark:bg-slate-900 px-3 py-1 rounded-xl inline-flex items-center gap-1">
               <Check className="w-3 h-3" /> Reclamado
             </span>
           ) : completed ? (
             <button
               onClick={() => claimChallengeReward(challenge.id)}
-              className="text-xs font-black px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm animate-bounce transition-transform active:scale-95"
+              className="text-xs font-black px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-transform active:scale-95"
             >
               ¡Reclamar +{challenge.recompensaXP} XP!
             </button>

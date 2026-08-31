@@ -17,7 +17,7 @@ const CourseDetail: React.FC = () => {
   if (!course) {
     return (
       <div className="p-6 text-center">
-        <p className="text-sm font-bold text-slate-600">Curso no encontrado</p>
+        <p className="text-sm font-bold text-slate-600 dark:text-slate-300">Curso no encontrado</p>
         <button
           onClick={() => navigate('/courses')}
           className="mt-4 px-4 py-2 bg-[#F05C54] text-white rounded-xl text-xs font-bold"
@@ -31,7 +31,7 @@ const CourseDetail: React.FC = () => {
   const { masteryPercent, completedTopicsCount } = getCourseProgress(course.id as CourseId);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 pb-4">
       {/* Course Colored Header */}
       <AppHeader
         title={course.nombre}
@@ -43,15 +43,15 @@ const CourseDetail: React.FC = () => {
       />
 
       {/* Course Summary Card */}
-      <div className="mx-4 -mt-6 bg-white rounded-2xl p-4 shadow-sm border border-slate-100 relative z-20">
-        <p className="text-xs text-slate-600 leading-relaxed font-medium">
+      <div className="mx-4 -mt-6 bg-white dark:bg-[#1E293B] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-700/80 relative z-20 transition-colors">
+        <p className="text-xs text-slate-600 dark:text-slate-200 leading-relaxed font-medium">
           {course.descripcion}
         </p>
 
-        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-400 block uppercase">Dominio global</span>
-            <span className="text-base font-black text-[#183153]">{masteryPercent}%</span>
+            <span className="text-[11px] font-bold text-slate-400 dark:text-slate-400 block uppercase">Dominio global</span>
+            <span className="text-base font-black text-[#183153] dark:text-white">{masteryPercent}%</span>
           </div>
 
           <button
@@ -68,11 +68,11 @@ const CourseDetail: React.FC = () => {
       {/* Topics list */}
       <div className="px-4 flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-black text-[#183153] flex items-center gap-1.5">
+          <h3 className="text-sm font-black text-[#183153] dark:text-white flex items-center gap-1.5">
             <Sparkles className="w-4 h-4 text-amber-500" />
             <span>Temas del Curso</span>
           </h3>
-          <span className="text-xs font-bold text-slate-400">
+          <span className="text-xs font-bold text-slate-400 dark:text-slate-400">
             {completedTopicsCount}/{course.temas.length} listos
           </span>
         </div>

@@ -19,7 +19,7 @@ const ProgressScreen: React.FC = () => {
   const minutesTotal = Math.round(totalTimeSeconds / 60);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 pb-4">
       {/* Exact Blue / Cyan Header requested */}
       <AppHeader
         title="Mi Progreso"
@@ -28,17 +28,17 @@ const ProgressScreen: React.FC = () => {
         bgGradient="from-[#12B7E8] to-[#36C7F0]"
       />
 
-      {/* When NO sessions exist: EXACT empty state with mascot Chuplingo in center */}
+      {/* When NO sessions exist */}
       {sessions.length === 0 ? (
         <div className="px-4 py-8 flex flex-col items-center justify-center text-center">
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 w-full flex flex-col items-center">
+          <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/80 w-full flex flex-col items-center">
             <ChuplingoMascot mood="curious" size="lg" />
 
-            <h3 className="text-xl font-black text-[#183153] mt-4">
+            <h3 className="text-xl font-black text-[#183153] dark:text-white mt-4">
               ¡Aún no hay prácticas!
             </h3>
 
-            <p className="text-xs text-slate-500 font-medium max-w-xs mt-2 leading-relaxed">
+            <p className="text-xs text-slate-500 dark:text-slate-300 font-medium max-w-xs mt-2 leading-relaxed">
               Completa una sesión de práctica para ver tu progreso, estadísticas por curso y gráficos aquí.
             </p>
 
@@ -53,28 +53,28 @@ const ProgressScreen: React.FC = () => {
         </div>
       ) : (
         <div className="px-4 flex flex-col gap-4">
-          {/* General Summary Card (Sesiones | Precisión | Correctas) */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+          {/* General Summary Card */}
+          <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/80 transition-colors">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-black text-[#183153] uppercase tracking-wide flex items-center gap-1.5">
+              <h3 className="text-xs font-black text-[#183153] dark:text-white uppercase tracking-wide flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Resumen General
               </h3>
-              <div className="flex gap-1 bg-slate-100 p-0.5 rounded-lg text-[10px] font-bold">
+              <div className="flex gap-1 bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg text-[10px] font-bold">
                 <button
                   onClick={() => setFilterPeriod('7')}
-                  className={`px-2 py-0.5 rounded-md ${filterPeriod === '7' ? 'bg-white text-[#183153] shadow-xs' : 'text-slate-400'}`}
+                  className={`px-2 py-0.5 rounded-md ${filterPeriod === '7' ? 'bg-white dark:bg-[#1E293B] text-[#183153] dark:text-white shadow-xs' : 'text-slate-400'}`}
                 >
                   7 días
                 </button>
                 <button
                   onClick={() => setFilterPeriod('30')}
-                  className={`px-2 py-0.5 rounded-md ${filterPeriod === '30' ? 'bg-white text-[#183153] shadow-xs' : 'text-slate-400'}`}
+                  className={`px-2 py-0.5 rounded-md ${filterPeriod === '30' ? 'bg-white dark:bg-[#1E293B] text-[#183153] dark:text-white shadow-xs' : 'text-slate-400'}`}
                 >
                   30 días
                 </button>
                 <button
                   onClick={() => setFilterPeriod('all')}
-                  className={`px-2 py-0.5 rounded-md ${filterPeriod === 'all' ? 'bg-white text-[#183153] shadow-xs' : 'text-slate-400'}`}
+                  className={`px-2 py-0.5 rounded-md ${filterPeriod === 'all' ? 'bg-white dark:bg-[#1E293B] text-[#183153] dark:text-white shadow-xs' : 'text-slate-400'}`}
                 >
                   Todo
                 </button>
@@ -82,50 +82,50 @@ const ProgressScreen: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="p-2.5 rounded-xl bg-cyan-50">
+              <div className="p-2.5 rounded-2xl bg-cyan-50 dark:bg-cyan-950/60">
                 <span className="text-lg font-black text-[#12B7E8] block leading-none">
                   {totalSessions}
                 </span>
-                <span className="text-[10px] font-bold text-slate-600 uppercase">
+                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase">
                   Sesiones
                 </span>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-emerald-50">
-                <span className="text-lg font-black text-emerald-600 block leading-none">
+              <div className="p-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60">
+                <span className="text-lg font-black text-emerald-600 dark:text-emerald-400 block leading-none">
                   {overallAccuracy}%
                 </span>
-                <span className="text-[10px] font-bold text-slate-600 uppercase">
+                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase">
                   Precisión
                 </span>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-orange-50">
+              <div className="p-2.5 rounded-2xl bg-orange-50 dark:bg-orange-950/60">
                 <span className="text-lg font-black text-[#FF9418] block leading-none">
                   {totalCorrect}
                 </span>
-                <span className="text-[10px] font-bold text-slate-600 uppercase">
+                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase">
                   Correctas
                 </span>
               </div>
             </div>
 
             {/* Extra stats */}
-            <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs text-slate-600">
+            <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/60 text-xs text-slate-600 dark:text-slate-300">
               <div className="flex items-center gap-1.5">
                 <BookOpen className="w-3.5 h-3.5 text-slate-400" />
-                <span>Preguntas: <strong className="text-[#183153]">{totalQuestions}</strong></span>
+                <span>Preguntas: <strong className="text-[#183153] dark:text-white">{totalQuestions}</strong></span>
               </div>
               <div className="flex items-center gap-1.5 justify-end">
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
-                <span>Tiempo: <strong className="text-[#183153]">{minutesTotal} min</strong></span>
+                <span>Tiempo: <strong className="text-[#183153] dark:text-white">{minutesTotal} min</strong></span>
               </div>
             </div>
           </div>
 
           {/* Weekly Activity Bar Chart */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-            <h3 className="text-xs font-black text-[#183153] uppercase tracking-wide mb-3 flex items-center gap-1.5">
+          <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/80 transition-colors">
+            <h3 className="text-xs font-black text-[#183153] dark:text-white uppercase tracking-wide mb-3 flex items-center gap-1.5">
               <BarChart3 className="w-3.5 h-3.5 text-[#12B7E8]" /> Actividad Semanal
             </h3>
 
@@ -135,7 +135,7 @@ const ProgressScreen: React.FC = () => {
 
                 return (
                   <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                    <span className="text-[9px] font-bold text-slate-400">
+                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-300">
                       {item.questions > 0 ? item.questions : ''}
                     </span>
                     <div 
@@ -143,12 +143,12 @@ const ProgressScreen: React.FC = () => {
                         item.isToday 
                           ? 'bg-[#12B7E8] shadow-sm' 
                           : item.questions > 0 
-                            ? 'bg-slate-300' 
-                            : 'bg-slate-100'
+                            ? 'bg-slate-300 dark:bg-slate-700' 
+                            : 'bg-slate-100 dark:bg-slate-800'
                       }`}
                       style={{ height: `${heightPercent}%` }}
                     />
-                    <span className={`text-[10px] font-black ${item.isToday ? 'text-[#12B7E8]' : 'text-slate-500'}`}>
+                    <span className={`text-[10px] font-black ${item.isToday ? 'text-[#12B7E8]' : 'text-slate-500 dark:text-slate-400'}`}>
                       {item.day}
                     </span>
                   </div>
@@ -157,9 +157,9 @@ const ProgressScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Study Recommendation Card (auto-calculated from user stats) */}
+          {/* Study Recommendation Card */}
           {recommended && (
-            <div className="bg-gradient-to-r from-[#7354D9] to-[#8C6EE8] text-white rounded-2xl p-4 shadow-sm">
+            <div className="bg-gradient-to-r from-[#7354D9] to-[#8C6EE8] text-white rounded-3xl p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <span className="text-[10px] uppercase font-black tracking-wider text-purple-200 block mb-1">
@@ -168,7 +168,7 @@ const ProgressScreen: React.FC = () => {
                   <h4 className="text-sm font-black">
                     {recommended.courseName} — {recommended.topicName}
                   </h4>
-                  <p className="text-xs text-purple-100 mt-0.5">
+                  <p className="text-xs text-purple-100 mt-0.5 font-medium">
                     Precisión actual: {recommended.accuracy}% • Refuerza este tema
                   </p>
                 </div>
@@ -184,31 +184,31 @@ const ProgressScreen: React.FC = () => {
           )}
 
           {/* Progress By Course List */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-            <h3 className="text-xs font-black text-[#183153] uppercase tracking-wide mb-3">
+          <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/80 transition-colors">
+            <h3 className="text-xs font-black text-[#183153] dark:text-white uppercase tracking-wide mb-3">
               Progreso por curso
             </h3>
 
             <div className="flex flex-col gap-3">
               {COURSES.map((course) => {
-                const { accuracy, masteryPercent } = getCourseProgress(course.id);
+                const { accuracy } = getCourseProgress(course.id);
 
                 return (
                   <div key={course.id} className="flex flex-col gap-1">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-extrabold text-[#183153] flex items-center gap-1.5">
+                      <span className="font-extrabold text-[#183153] dark:text-white flex items-center gap-1.5">
                         <span 
                           className="w-2.5 h-2.5 rounded-full" 
                           style={{ backgroundColor: course.colorHex }}
                         />
                         {course.nombre}
                       </span>
-                      <span className="font-black text-[#183153]">
+                      <span className="font-black text-[#183153] dark:text-white">
                         {accuracy}%
                       </span>
                     </div>
 
-                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="w-full h-2 bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden">
                       <div 
                         className="h-full rounded-full transition-all duration-500"
                         style={{ 
@@ -226,7 +226,7 @@ const ProgressScreen: React.FC = () => {
           {/* Recent Practice History Button */}
           <button
             onClick={() => navigate('/history')}
-            className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-slate-50 text-[#183153] font-black text-xs border border-slate-200 flex items-center justify-between shadow-sm"
+            className="w-full py-3.5 px-4 rounded-3xl bg-white dark:bg-[#1E293B] hover:bg-slate-50 dark:hover:bg-slate-800 text-[#183153] dark:text-white font-black text-xs border border-slate-200 dark:border-slate-700/80 flex items-center justify-between shadow-sm transition-colors"
           >
             <span>Ver historial completo de prácticas ({sessions.length})</span>
             <ArrowRight className="w-4 h-4 text-slate-400" />

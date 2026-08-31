@@ -21,7 +21,7 @@ const CoursesList: React.FC = () => {
         }
       />
 
-      <div className="px-4 flex flex-col gap-3.5 pt-1">
+      <div className="px-4 flex flex-col gap-3.5 pt-1 pb-4">
         {COURSES.map((course) => (
           <CourseCard key={course.id} course={course} />
         ))}

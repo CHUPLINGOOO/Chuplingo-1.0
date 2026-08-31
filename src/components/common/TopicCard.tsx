@@ -27,21 +27,21 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, course }) => {
         : 'No iniciado';
 
   const statusBadge = {
-    dominado: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    en_progreso: 'bg-amber-50 text-amber-700 border-amber-200',
-    no_iniciado: 'bg-slate-50 text-slate-500 border-slate-200'
+    dominado: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+    en_progreso: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+    no_iniciado: 'bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800'
   }[status];
 
   return (
     <div 
       onClick={() => navigate(`/practice-setup/${course.id}/${topic.id}`)}
-      className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 cursor-pointer group transition-all duration-200 hover:shadow-md hover:border-slate-200 active:scale-[0.99] flex items-center gap-3.5"
+      className="bg-white dark:bg-[#1E293B] rounded-3xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/80 cursor-pointer group transition-all duration-200 hover:shadow-md hover:border-slate-200 dark:hover:border-slate-600 active:scale-[0.99] flex items-center gap-3.5"
     >
       {/* Big Topic Number */}
       <div 
-        className="w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 font-black text-sm transition-transform group-hover:scale-105"
+        className="w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 font-black text-sm transition-transform group-hover:scale-105 shadow-2xs"
         style={{ 
-          backgroundColor: `${course.colorHex}15`,
+          backgroundColor: `${course.colorHex}20`,
           color: course.colorHex 
         }}
       >
@@ -52,15 +52,15 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, course }) => {
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-0.5">
-          <h4 className="text-sm font-black text-[#183153] leading-snug truncate">
+          <h4 className="text-sm font-black text-[#183153] dark:text-white leading-snug truncate">
             {topic.nombre}
           </h4>
-          <span className="text-[10px] text-slate-400 font-bold">
+          <span className="text-[10px] text-slate-400 dark:text-slate-400 font-bold">
             {questionsInTopic} preg.
           </span>
         </div>
         
-        <p className="text-xs text-slate-500 line-clamp-1">
+        <p className="text-xs text-slate-500 dark:text-slate-300 line-clamp-1 font-medium">
           {topic.descripcion}
         </p>
 
@@ -70,7 +70,7 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, course }) => {
             {status === 'en_progreso' && <Clock className="w-2.5 h-2.5" />}
             {statusLabel}
           </span>
-          <span className="text-[11px] font-extrabold text-[#183153]">
+          <span className="text-[11px] font-extrabold text-[#183153] dark:text-slate-200">
             Dominio: <span style={{ color: course.colorHex }}>{accuracy}%</span>
           </span>
         </div>

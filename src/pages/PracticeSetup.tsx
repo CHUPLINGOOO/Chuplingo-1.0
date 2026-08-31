@@ -4,7 +4,7 @@ import { COURSES } from '../data/coursesData';
 import { AppHeader } from '../components/layout/AppHeader';
 import { useChuplingo } from '../context/ChuplingoContext';
 import { PracticeMode, CourseId, UniversityTarget } from '../types/chuplingo';
-import { Zap, Target, Flame, AlertCircle, Star, GraduationCap, Check, ArrowRight, Timer, Building2 } from 'lucide-react';
+import { Zap, Target, Flame, AlertCircle, Star, Timer, Building2, Check, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PracticeSetup: React.FC = () => {
@@ -108,7 +108,7 @@ const PracticeSetup: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 pb-6">
       <AppHeader
         title="Personalizar Práctica"
         subtitle="Elige universidad, curso y modalidad"
@@ -121,14 +121,14 @@ const PracticeSetup: React.FC = () => {
         {/* University Exam Filter */}
         {selectedMode !== 'simulacro' && selectedMode !== 'errores' && selectedMode !== 'favoritos' && (
           <div>
-            <label className="text-xs font-black text-[#183153] uppercase tracking-wide flex items-center gap-1.5 mb-2">
-              <Building2 className="w-3.5 h-3.5 text-[#183153]" />
+            <label className="text-xs font-black text-[#183153] dark:text-white uppercase tracking-wide flex items-center gap-1.5 mb-2">
+              <Building2 className="w-3.5 h-3.5 text-[#183153] dark:text-slate-300" />
               <span>Universidad Objetivo</span>
             </label>
             <select
               value={selectedUniversity}
               onChange={(e) => setSelectedUniversity(e.target.value as UniversityTarget)}
-              className="w-full bg-white border border-slate-200 rounded-2xl p-3.5 text-xs font-black text-[#183153] focus:outline-none focus:ring-2 focus:ring-[#F05C54] shadow-2xs"
+              className="w-full bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700/80 rounded-2xl p-3.5 text-xs font-black text-[#183153] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#F05C54] shadow-2xs"
             >
               {universities.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -142,7 +142,7 @@ const PracticeSetup: React.FC = () => {
         {/* Course selector */}
         {selectedMode !== 'simulacro' && selectedMode !== 'errores' && selectedMode !== 'favoritos' && (
           <div>
-            <label className="text-xs font-black text-[#183153] uppercase tracking-wide block mb-2">
+            <label className="text-xs font-black text-[#183153] dark:text-white uppercase tracking-wide block mb-2">
               Curso Preuniversitario
             </label>
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
@@ -155,14 +155,14 @@ const PracticeSetup: React.FC = () => {
                       setSelectedCourseId(course.id);
                       setSelectedTopicId('all');
                     }}
-                    className={`px-3 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border ${
+                    className={`px-3.5 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border ${
                       isSelected
-                        ? 'bg-[#183153] text-white border-[#183153] shadow-xs'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        ? 'bg-[#183153] dark:bg-purple-600 text-white border-[#183153] dark:border-purple-600 shadow-xs'
+                        : 'bg-white dark:bg-[#1E293B] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
                     }`}
                   >
                     <span 
-                      className="w-2 h-2 rounded-full" 
+                      className="w-2.5 h-2.5 rounded-full" 
                       style={{ backgroundColor: course.colorHex }}
                     />
                     {course.nombre}
@@ -176,13 +176,13 @@ const PracticeSetup: React.FC = () => {
         {/* Topic selector */}
         {selectedMode !== 'simulacro' && selectedMode !== 'errores' && selectedMode !== 'favoritos' && (
           <div>
-            <label className="text-xs font-black text-[#183153] uppercase tracking-wide block mb-2">
+            <label className="text-xs font-black text-[#183153] dark:text-white uppercase tracking-wide block mb-2">
               Tema Específico
             </label>
             <select
               value={selectedTopicId}
               onChange={(e) => setSelectedTopicId(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-2xl p-3.5 text-xs font-bold text-[#183153] focus:outline-none focus:ring-2 focus:ring-[#F05C54] shadow-2xs"
+              className="w-full bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700/80 rounded-2xl p-3.5 text-xs font-bold text-[#183153] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#F05C54] shadow-2xs"
             >
               <option value="all">📚 Todos los temas de {activeCourse.nombre}</option>
               {activeCourse.temas.map((topic) => (
@@ -197,10 +197,10 @@ const PracticeSetup: React.FC = () => {
         {/* Difficulty Filter */}
         {selectedMode !== 'errores' && (
           <div>
-            <label className="text-xs font-black text-[#183153] uppercase tracking-wide block mb-2">
+            <label className="text-xs font-black text-[#183153] dark:text-white uppercase tracking-wide block mb-2">
               Nivel de Dificultad
             </label>
-            <div className="grid grid-cols-4 gap-1.5 bg-slate-200/80 p-1 rounded-2xl text-xs font-bold">
+            <div className="grid grid-cols-4 gap-1.5 bg-slate-200/80 dark:bg-slate-800 p-1 rounded-2xl text-xs font-bold">
               {[
                 { id: 'todas', label: 'Todas' },
                 { id: 'basico', label: 'Básico' },
@@ -210,8 +210,10 @@ const PracticeSetup: React.FC = () => {
                 <button
                   key={d.id}
                   onClick={() => setSelectedDifficulty(d.id)}
-                  className={`py-1.5 rounded-xl transition-all text-center ${
-                    selectedDifficulty === d.id ? 'bg-white text-[#183153] shadow-xs' : 'text-slate-600'
+                  className={`py-2 rounded-xl transition-all text-center font-black ${
+                    selectedDifficulty === d.id 
+                      ? 'bg-white dark:bg-[#1E293B] text-[#183153] dark:text-white shadow-xs' 
+                      : 'text-slate-600 dark:text-slate-400'
                   }`}
                 >
                   {d.label}
@@ -223,7 +225,7 @@ const PracticeSetup: React.FC = () => {
 
         {/* Practice Mode Options */}
         <div>
-          <label className="text-xs font-black text-[#183153] uppercase tracking-wide block mb-2">
+          <label className="text-xs font-black text-[#183153] dark:text-white uppercase tracking-wide block mb-2">
             Modalidad de práctica
           </label>
 
@@ -244,10 +246,10 @@ const PracticeSetup: React.FC = () => {
                   }}
                   className={`p-3.5 rounded-3xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                     mode.disabled
-                      ? 'opacity-45 bg-slate-50 border-slate-200 cursor-not-allowed'
+                      ? 'opacity-45 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 cursor-not-allowed'
                       : isSelected
-                        ? 'bg-white border-2 shadow-md'
-                        : 'bg-white border-slate-200 hover:border-slate-300'
+                        ? 'bg-white dark:bg-[#1E293B] border-2 shadow-md'
+                        : 'bg-white dark:bg-[#1E293B] border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                   }`}
                   style={{
                     borderColor: isSelected ? activeCourse.colorHex : undefined
@@ -257,7 +259,7 @@ const PracticeSetup: React.FC = () => {
                     <div 
                       className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs"
                       style={{ 
-                        backgroundColor: `${mode.color}15`,
+                        backgroundColor: `${mode.color}20`,
                         color: mode.color 
                       }}
                     >
@@ -265,10 +267,10 @@ const PracticeSetup: React.FC = () => {
                     </div>
 
                     <div className="min-w-0">
-                      <h4 className="text-sm font-black text-[#183153] truncate">
+                      <h4 className="text-sm font-black text-[#183153] dark:text-white truncate">
                         {mode.title}
                       </h4>
-                      <p className="text-[11px] text-slate-500 line-clamp-1 font-medium">
+                      <p className="text-[11px] text-slate-500 dark:text-slate-300 line-clamp-1 font-medium">
                         {mode.description}
                       </p>
                     </div>
@@ -278,7 +280,7 @@ const PracticeSetup: React.FC = () => {
                     <span 
                       className="text-[10px] font-black px-2.5 py-1 rounded-xl"
                       style={{ 
-                        backgroundColor: `${mode.color}15`,
+                        backgroundColor: `${mode.color}20`,
                         color: mode.color 
                       }}
                     >
@@ -301,7 +303,7 @@ const PracticeSetup: React.FC = () => {
         </div>
 
         {/* Start Button */}
-        <div className="pt-2 pb-5">
+        <div className="pt-2 pb-2">
           <button
             onClick={handleStart}
             className="w-full py-4 px-6 rounded-2xl text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"

@@ -78,7 +78,7 @@ const Home: React.FC = () => {
             >
               <Bell className="w-4 h-4" />
               {unreadNotifs > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-300 text-[#183153] font-black text-[9px] rounded-full flex items-center justify-center ring-2 ring-[#F05C54] animate-bounce">
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-300 text-[#183153] font-black text-[9px] rounded-full flex items-center justify-center ring-2 ring-[#F05C54]">
                   {unreadNotifs}
                 </span>
               )}
@@ -88,7 +88,7 @@ const Home: React.FC = () => {
               onClick={() => navigate('/profile')} 
               className="cursor-pointer active:scale-95 transition-transform"
             >
-              <ChuplingoMascot mood="happy" size="sm" />
+              <ChuplingoMascot mood="happy" avatarId={user.avatar} size="sm" />
             </div>
           </div>
         </div>
@@ -102,10 +102,10 @@ const Home: React.FC = () => {
 
       {/* Selector Rápido de Banco de Preguntas por Universidad */}
       <div className="px-4">
-        <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100">
+        <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/80 transition-colors">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-black text-[#183153] uppercase tracking-wide flex items-center gap-1.5">
-              <Building2 className="w-4 h-4 text-[#183153]" />
+            <h3 className="text-xs font-black text-[#183153] dark:text-white uppercase tracking-wide flex items-center gap-1.5">
+              <Building2 className="w-4 h-4 text-[#F05C54]" />
               <span>Exámenes de Admisión Oficiales</span>
             </h3>
             <span className="text-[10px] font-black text-[#F05C54]">Banco 2024</span>
@@ -116,12 +116,12 @@ const Home: React.FC = () => {
               <button
                 key={u.id}
                 onClick={() => navigate(`/practice-setup?university=${u.id}`)}
-                className="p-2.5 rounded-2xl bg-[#F8FAFC] hover:bg-slate-100/90 border border-slate-200/80 transition-all flex flex-col items-center text-center group active:scale-95"
+                className="p-2.5 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 transition-all flex flex-col items-center text-center group active:scale-95"
               >
-                <span className="text-xs font-black text-[#183153] group-hover:text-[#F05C54] transition-colors">
+                <span className="text-xs font-black text-[#183153] dark:text-white group-hover:text-[#F05C54] transition-colors">
                   {u.name}
                 </span>
-                <span className="text-[10px] font-bold text-slate-400 mt-0.5">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 mt-0.5">
                   {u.year}
                 </span>
               </button>
@@ -230,7 +230,7 @@ const Home: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-[#F05C54]" />
-            <h2 className="text-base font-black text-[#183153]">
+            <h2 className="text-base font-black text-[#183153] dark:text-white">
               Mis Cursos
             </h2>
           </div>
@@ -253,7 +253,7 @@ const Home: React.FC = () => {
       {/* Desafíos de Hoy Preview */}
       <div className="px-4 flex flex-col gap-3 mb-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-black text-[#183153] flex items-center gap-2">
+          <h2 className="text-base font-black text-[#183153] dark:text-white flex items-center gap-2">
             <span>🏆</span> Desafíos de Hoy
           </h2>
           <button

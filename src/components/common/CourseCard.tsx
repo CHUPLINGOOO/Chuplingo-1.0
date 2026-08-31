@@ -30,7 +30,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
   return (
     <div 
       onClick={() => navigate(`/courses/${course.id}`)}
-      className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative cursor-pointer group transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99]"
+      className="bg-white dark:bg-[#1E293B] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700/80 overflow-hidden relative cursor-pointer group transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99]"
     >
       {/* Distinctive colored left border strip */}
       <div 
@@ -45,7 +45,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
             <div 
               className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105"
               style={{ 
-                backgroundColor: `${course.colorHex}15`,
+                backgroundColor: `${course.colorHex}20`,
                 color: course.colorHex 
               }}
             >
@@ -54,14 +54,14 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-1">
-                <h3 className="text-base font-black text-[#183153] leading-tight truncate">
+                <h3 className="text-base font-black text-[#183153] dark:text-white leading-tight truncate">
                   {course.nombre}
                 </h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-300 shrink-0">
                   {questionsInCourse} preguntas
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+              <p className="text-xs text-slate-500 dark:text-slate-300 mt-1 line-clamp-2 leading-relaxed font-medium">
                 {course.descripcion}
               </p>
             </div>
@@ -69,13 +69,13 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
         </div>
 
         {/* Progress Bar & Info */}
-        <div className="mt-4 pt-3 border-t border-slate-100/90">
+        <div className="mt-4 pt-3 border-t border-slate-100/90 dark:border-slate-700/60">
           <div className="flex items-center justify-between text-xs mb-1.5">
-            <span className="font-semibold text-slate-500">Progreso</span>
-            <span className="font-black text-[#183153]">{masteryPercent}%</span>
+            <span className="font-semibold text-slate-500 dark:text-slate-400">Progreso</span>
+            <span className="font-black text-[#183153] dark:text-white">{masteryPercent}%</span>
           </div>
 
-          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden">
             <div 
               className="h-full rounded-full transition-all duration-500"
               style={{ 
@@ -86,7 +86,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
           </div>
 
           <div className="flex items-center justify-between mt-3 pt-1">
-            <span className="text-[11px] font-medium text-slate-500">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-300">
               {completedTopicsCount} de {course.temas.length} temas dominados
             </span>
 
