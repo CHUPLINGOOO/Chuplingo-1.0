@@ -18,6 +18,7 @@ import {
 import { COURSES, LEVEL_THRESHOLDS } from '../data/coursesData';
 import { INITIAL_CHALLENGES } from '../data/challengesData';
 import { INITIAL_ACHIEVEMENTS } from '../data/achievementsData';
+import { formatPrettyTopicName, getCourseEmoji } from '../utils/topicFormatter';
 import { supabase } from '../integrations/supabase/client';
 import { toast } from 'sonner';
 import { triggerConfetti } from '../utils/confetti';
@@ -36,7 +37,6 @@ const UNIVERSITY_TAGS_POOL = [
   'UNSA 2022'
 ];
 
-// Reemplaza textos genéricos de IA o metadatos por prestigiosas universidades del Perú
 const sanitizeUniversitySource = (rawOrigin?: string | null, rawDoc?: string | null, questionId?: string): string => {
   const combined = `${rawOrigin || ''} ${rawDoc || ''}`.toLowerCase();
 
@@ -48,13 +48,11 @@ const sanitizeUniversitySource = (rawOrigin?: string | null, rawDoc?: string | n
   if (combined.includes('pucp') || combined.includes('catolica')) return 'PUCP Admisión';
   if (combined.includes('unac') || combined.includes('callao')) return 'UNAC 2023';
 
-  // Si tiene el texto genérico "pregunta generada a partir de..." se sustituye por rotación determinista
   if (combined.includes('pregunta_generada') || combined.includes('pregunta generada') || combined.includes('contenido_fuente') || !rawOrigin) {
     const hash = (questionId || 'q').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return UNIVERSITY_TAGS_POOL[hash % UNIVERSITY_TAGS_POOL.length];
   }
 
-  // Devolver el origen capitalizado
   return rawOrigin || 'Admisión Universitaria';
 };
 
@@ -355,31 +353,17 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const mapDbQuestion = useCallback((dbQ: any): Question => {
     const normalizedCourse = normalizeCourseId(dbQ.course_id || 'literatura');
-    const course = COURSES.find(c => c.id === normalizedCourse);
-
-    const rawTopic = (dbQ.topic_id || '').toString().trim();
-    const topic = course?.temas.find(t => 
-      t.id.toLowerCase() === rawTopic.toLowerCase() ||
-      t.nombre.toLowerCase() === rawTopic.toLowerCase() ||
-      rawTopic.toLowerCase().includes(t.nombre.toLowerCase()) ||
-      t.nombre.toLowerCase().includes(rawTopic.toLowerCase()) ||
-      String(t.numero) === rawTopic
-    );
-
-    const topicId = topic?.id || dbQ.topic_id || undefined;
-    const topicName = topic?.nombre || dbQ.topic_id || 'Tema General';
+    const prettyTopic = formatPrettyTopicName(dbQ.topic_id, normalizedCourse);
+    const uniTag = sanitizeUniversitySource(dbQ.origin, dbQ.source_document, dbQ.id);
 
     const rawCorrect = (dbQ.correct_answer || 'A').toString().toUpperCase().trim().replace(/[^A-E]/g, '') || 'A';
     const cleanCorrect = (['A', 'B', 'C', 'D', 'E'].includes(rawCorrect) ? rawCorrect : 'A') as 'A' | 'B' | 'C' | 'D' | 'E';
 
-    // Formatear automáticamente fuente a universidades peruanas (UNSA, UNMSM, UNI, UNFV, UNSAAC)
-    const uniTag = sanitizeUniversitySource(dbQ.origin, dbQ.source_document, dbQ.id);
-
     return {
       id: String(dbQ.id),
       courseId: normalizedCourse,
-      topicId: topicId,
-      topicName: topicName,
+      topicId: dbQ.topic_id || undefined,
+      topicName: prettyTopic,
       subtopic: dbQ.subtopic || undefined,
       pregunta: dbQ.question || '',
       alternativas: [
@@ -546,7 +530,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return { questions: fastShuffle(data.map(mapDbQuestion)).slice(0, targetCount) };
       }
 
-      // Fallback
       if (params.courseId) {
         const { data: courseData } = await supabase
           .from('questions')
@@ -652,14 +635,14 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (remoteSessions && remoteSessions.length > 0) {
         const mappedSessions: PracticeSession[] = remoteSessions.map(s => {
           const course = COURSES.find(c => c.id === s.course_id);
-          const topic = course?.temas.find(t => t.id === s.topic_id);
+          const prettyTopic = formatPrettyTopicName(s.topic_id, s.course_id || undefined);
           return {
             id: s.id,
             userId: s.user_id,
             courseId: (s.course_id as CourseId) || undefined,
-            courseName: course?.nombre || 'Simulacro Tipo Admisión',
+            courseName: course ? `${getCourseEmoji(course.id)} ${course.nombre}` : 'Simulacro Tipo Admisión',
             topicId: s.topic_id || undefined,
-            topicName: topic?.nombre || (s.course_id ? 'Práctica General' : 'Multi-curso (8 Áreas)'),
+            topicName: prettyTopic || (s.course_id ? 'Práctica General' : 'Multi-curso (8 Áreas)'),
             mode: (s.mode as any) || 'rapida',
             fecha: s.completed_at,
             duracionSegundos: s.duration_seconds || 0,
@@ -1853,7 +1836,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return {
         courseId: 'literatura' as CourseId,
         topicId: 'lit-1',
-        topicName: 'Géneros y Figuras Literarias',
+        topicName: '📖 Géneros y Figuras Literarias',
         courseName: 'Literatura',
         accuracy: 0
       };
@@ -1870,7 +1853,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           candidate = {
             courseId: course.id,
             topicId: topic.id,
-            topicName: topic.nombre,
+            topicName: formatPrettyTopicName(topic.id, course.id),
             courseName: course.nombre,
             accuracy: prog.accuracy
           };

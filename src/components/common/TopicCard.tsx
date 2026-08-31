@@ -3,6 +3,7 @@ import { Topic, Course } from '../../types/chuplingo';
 import { useChuplingo } from '../../context/ChuplingoContext';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, CheckCircle, Clock } from 'lucide-react';
+import { getCourseEmoji } from '../../utils/topicFormatter';
 
 interface TopicCardProps {
   topic: Topic;
@@ -16,6 +17,7 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, course }) => {
 
   const formatNumber = (num: number) => String(num).padStart(2, '0');
   const questionsInTopic = topicQuestionCounts[topic.id] || 100;
+  const courseEmoji = getCourseEmoji(course.id);
 
   const statusLabel = 
     status === 'dominado' 
@@ -43,8 +45,8 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, course }) => {
           color: course.colorHex 
         }}
       >
-        <span className="text-xs opacity-75">TEMA</span>
-        <span className="text-base leading-none">{formatNumber(topic.numero)}</span>
+        <span className="text-xs">{courseEmoji}</span>
+        <span className="text-sm font-black leading-none mt-0.5">{formatNumber(topic.numero)}</span>
       </div>
 
       {/* Info */}
@@ -75,12 +77,7 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, course }) => {
       </div>
 
       {/* Action Chevron */}
-      <div 
-        className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 group-hover:text-white transition-colors shrink-0"
-        style={{ 
-          backgroundColor: 'transparent'
-        }}
-      >
+      <div className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 group-hover:text-white transition-colors shrink-0">
         <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
       </div>
     </div>
