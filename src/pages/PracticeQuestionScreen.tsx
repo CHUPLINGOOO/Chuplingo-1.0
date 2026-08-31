@@ -3,7 +3,22 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { COURSES } from '../data/coursesData';
 import { Question, QuestionAttempt, CourseId, PracticeMode } from '../types/chuplingo';
 import { useChuplingo } from '../context/ChuplingoContext';
-import { Star, ArrowRight, CheckCircle2, XCircle, Lightbulb, ArrowLeft, Timer, Sparkles, AlertTriangle, RefreshCw, WifiOff, Database } from 'lucide-react';
+import { ExitPracticeDialog } from '../components/practice/ExitPracticeDialog';
+import { 
+  Star, 
+  ArrowRight, 
+  CheckCircle2, 
+  XCircle, 
+  Lightbulb, 
+  X, 
+  Timer, 
+  Sparkles, 
+  RefreshCw, 
+  WifiOff, 
+  Database,
+  GraduationCap,
+  Award
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 const PracticeQuestionScreen: React.FC = () => {
@@ -24,6 +39,7 @@ const PracticeQuestionScreen: React.FC = () => {
   const topicParam = searchParams.get('topic') || 'all';
   const modeParam = (searchParams.get('mode') as PracticeMode) || 'rapida';
   const difficultyParam = searchParams.get('difficulty') || 'todas';
+  const universityParam = searchParams.get('university') || 'todas';
 
   const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -38,6 +54,7 @@ const PracticeQuestionScreen: React.FC = () => {
   const [startTime] = useState<number>(Date.now());
   const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
   const [secondsRemaining, setSecondsRemaining] = useState<number>(modeParam === 'simulacro' ? 1500 : 0);
+  const [showExitModal, setShowExitModal] = useState(false);
 
   const loadSession = async () => {
     setLoadError(null);
@@ -54,6 +71,7 @@ const PracticeQuestionScreen: React.FC = () => {
       topicId: topicParam,
       mode: modeParam,
       difficulty: difficultyParam,
+      university: universityParam,
       count: questionsCount
     });
 
@@ -68,7 +86,7 @@ const PracticeQuestionScreen: React.FC = () => {
 
   useEffect(() => {
     loadSession();
-  }, [courseParam, topicParam, modeParam, difficultyParam, fetchQuestionsForSession]);
+  }, [courseParam, topicParam, modeParam, difficultyParam, universityParam, fetchQuestionsForSession]);
 
   const currentQuestion = sessionQuestions[currentIndex];
   const isLastQuestion = currentIndex === sessionQuestions.length - 1;
@@ -99,7 +117,7 @@ const PracticeQuestionScreen: React.FC = () => {
       <div className="min-h-screen bg-[#F7F8FC] flex flex-col items-center justify-center p-6 text-center">
         <Sparkles className="w-10 h-10 text-[#F05C54] animate-spin mb-3" />
         <p className="text-sm font-black text-[#183153]">Consultando Supabase...</p>
-        <p className="text-xs text-slate-400 mt-1">Conectando a https://hxgvvdudphmulqwgenps.supabase.co</p>
+        <p className="text-xs text-slate-400 mt-1">Descargando preguntas de admisión en vivo</p>
       </div>
     );
   }
@@ -130,13 +148,6 @@ const PracticeQuestionScreen: React.FC = () => {
           >
             <RefreshCw className="w-4 h-4" />
             <span>Reintentar conexión con Supabase</span>
-          </button>
-
-          <button
-            onClick={() => navigate('/admin')}
-            className="w-full py-3 bg-[#183153] hover:bg-[#10223A] text-white rounded-2xl text-xs font-bold transition-colors"
-          >
-            Ir al Panel Admin (Importar preguntas)
           </button>
 
           <button
@@ -216,55 +227,65 @@ const PracticeQuestionScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7F8FC] flex flex-col justify-between">
-      {/* Top Header & Progress */}
-      <div className="bg-white px-4 pt-4 pb-3 border-b border-slate-100 shadow-sm sticky top-0 z-30">
+    <div className="min-h-screen bg-[#F7F8FC] flex flex-col justify-between select-none">
+      {/* Dialogo Moderno de Salida */}
+      <ExitPracticeDialog
+        isOpen={showExitModal}
+        onContinue={() => setShowExitModal(false)}
+        onExit={() => {
+          setShowExitModal(false);
+          navigate(-1);
+        }}
+        answeredCount={currentIndex}
+        totalCount={sessionQuestions.length}
+      />
+
+      {/* Top Header & Progress Bar */}
+      <div className="bg-white/95 backdrop-blur-md px-4 pt-4 pb-3 border-b border-slate-100 shadow-xs sticky top-0 z-30">
         <div className="flex items-center justify-between mb-2">
+          {/* Botón de escape moderno */}
           <button
-            onClick={() => {
-              if (window.confirm('¿Seguro que deseas salir de la sesión actual?')) {
-                navigate(-1);
-              }
-            }}
-            className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors"
+            onClick={() => setShowExitModal(true)}
+            className="w-9 h-9 rounded-2xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 flex items-center justify-center text-slate-600 transition-colors shadow-2xs active:scale-90"
+            title="Pausar o salir del test"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <X className="w-4 h-4 stroke-[2.5]" />
           </button>
 
-          <div className="text-center">
-            <span className="text-xs font-black text-[#183153]">
+          <div className="text-center flex flex-col items-center">
+            <span className="text-xs font-black text-[#183153] tracking-tight">
               {modeParam === 'simulacro' ? 'Simulacro de Admisión' : activeCourse.nombre}
             </span>
-            <span className="text-[11px] text-slate-400 font-bold block">
-              Pregunta {currentIndex + 1} de {sessionQuestions.length} (Supabase Online)
+            <span className="text-[11px] text-slate-400 font-bold">
+              Pregunta {currentIndex + 1} de {sessionQuestions.length}
             </span>
           </div>
 
           <div className="flex items-center gap-1.5">
             {modeParam === 'simulacro' && (
-              <div className="flex items-center gap-1 bg-purple-50 text-[#7354D9] px-2 py-1 rounded-xl text-xs font-black">
+              <div className="flex items-center gap-1 bg-purple-50 text-[#7354D9] px-2.5 py-1 rounded-xl text-xs font-black border border-purple-100">
                 <Timer className="w-3.5 h-3.5" />
                 <span>{formatTimer(secondsRemaining)}</span>
               </div>
             )}
             <button
               onClick={() => toggleFavorite(currentQuestion.id)}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+              className={`w-9 h-9 rounded-2xl flex items-center justify-center transition-all active:scale-90 ${
                 isCurrentFavorite 
-                  ? 'bg-amber-50 text-amber-500' 
+                  ? 'bg-amber-100 text-amber-600 shadow-xs ring-2 ring-amber-200' 
                   : 'bg-slate-100 text-slate-400 hover:text-amber-500'
               }`}
               title="Guardar pregunta"
             >
-              <Star className={`w-4 h-4 ${isCurrentFavorite ? 'fill-amber-400' : ''}`} />
+              <Star className={`w-4 h-4 ${isCurrentFavorite ? 'fill-amber-500' : ''}`} />
             </button>
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+        {/* Dynamic Colorful Progress Bar */}
+        <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden p-0.5">
           <div 
-            className="h-full rounded-full transition-all duration-300"
+            className="h-full rounded-full transition-all duration-300 shadow-xs"
             style={{ 
               width: `${progressPercent}%`,
               backgroundColor: activeCourse.colorHex 
@@ -273,54 +294,56 @@ const PracticeQuestionScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Question Card */}
-      <div className="p-4 flex-1 flex flex-col gap-4 max-w-[430px] mx-auto w-full">
-        {/* Metadata Chips */}
+      {/* Main Question Container */}
+      <div className="p-4 flex-1 flex flex-col gap-3.5 max-w-[430px] mx-auto w-full">
+        {/* Metadata Chips: Universidad y Tema */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Badge Oficial Universidad (UNMSM, UNI, UNSA, UNFV, UNSAAC) */}
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-black px-3 py-1 rounded-xl bg-[#183153] text-white shadow-xs">
+            <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
+            <span>{currentQuestion.fuente || 'UNMSM 2024-I'}</span>
+          </span>
+
           <span 
-            className="text-[10px] font-black px-2.5 py-1 rounded-full text-white"
+            className="text-[10px] font-black px-2.5 py-1 rounded-xl text-white shadow-2xs"
             style={{ backgroundColor: activeCourse.colorHex }}
           >
             {currentQuestion.topicName || activeCourse.nombre}
           </span>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 capitalize">
+
+          <span className="text-[10px] font-black px-2 py-1 rounded-xl bg-slate-100 text-slate-700 capitalize border border-slate-200">
             Nivel {currentQuestion.dificultad}
           </span>
-          {currentQuestion.fuente && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 truncate max-w-[200px]">
-              {currentQuestion.fuente}
-            </span>
-          )}
         </div>
 
-        {/* Question Text */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-          <h2 className="text-sm sm:text-base font-bold text-[#183153] leading-relaxed">
+        {/* Question Enunciation Card */}
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 transition-all">
+          <h2 className="text-sm sm:text-base font-black text-[#183153] leading-relaxed">
             {currentQuestion.pregunta}
           </h2>
         </div>
 
-        {/* 5 Alternatives (A, B, C, D, E) */}
+        {/* Alternatives (A, B, C, D, E) */}
         <div className="flex flex-col gap-2.5">
           {currentQuestion.alternativas.map((alt) => {
             const isSelected = selectedAnswer === alt.id;
             const isCorrect = alt.id === currentQuestion.respuestaCorrecta;
 
-            let optionStyle = 'bg-white border-slate-200 hover:border-slate-300 text-slate-800';
-            let badgeStyle = 'bg-slate-100 text-slate-600';
+            let optionStyle = 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-800 shadow-2xs';
+            let badgeStyle = 'bg-slate-100 text-slate-700';
 
             if (isAnswerLocked) {
               if (isCorrect) {
-                optionStyle = 'bg-emerald-50 border-2 border-emerald-500 text-emerald-950 font-bold';
+                optionStyle = 'bg-emerald-50/90 border-2 border-emerald-500 text-emerald-950 font-black shadow-sm';
                 badgeStyle = 'bg-emerald-500 text-white font-black';
               } else if (isSelected && !isCorrect) {
-                optionStyle = 'bg-rose-50 border-2 border-rose-500 text-rose-950';
+                optionStyle = 'bg-rose-50/90 border-2 border-rose-500 text-rose-950 font-black shadow-sm';
                 badgeStyle = 'bg-rose-500 text-white font-black';
               } else {
-                optionStyle = 'bg-slate-50/70 border-slate-100 text-slate-400 opacity-60';
+                optionStyle = 'bg-slate-50/60 border-slate-100 text-slate-400 opacity-55';
               }
             } else if (isSelected) {
-              optionStyle = 'bg-white border-2 shadow-sm';
+              optionStyle = 'bg-white border-2 shadow-md';
               badgeStyle = 'bg-[#183153] text-white';
             }
 
@@ -331,10 +354,10 @@ const PracticeQuestionScreen: React.FC = () => {
                 onClick={() => handleSelectOption(alt.id)}
                 className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all active:scale-[0.99] ${optionStyle}`}
               >
-                <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 transition-colors ${badgeStyle}`}>
+                <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 transition-colors shadow-2xs ${badgeStyle}`}>
                   {alt.id}
                 </span>
-                <span className="text-xs sm:text-sm pt-0.5 leading-snug flex-1">
+                <span className="text-xs sm:text-sm pt-0.5 leading-snug flex-1 font-semibold">
                   {alt.text}
                 </span>
               </button>
@@ -344,16 +367,16 @@ const PracticeQuestionScreen: React.FC = () => {
 
         {/* Pedagogical Feedback */}
         {isAnswerLocked && (
-          <div className={`p-4 rounded-2xl border animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+          <div className={`p-4 rounded-3xl border animate-in fade-in slide-in-from-bottom-2 duration-200 shadow-xs ${
             selectedAnswer === currentQuestion.respuestaCorrecta
               ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
               : 'bg-rose-50 border-rose-200 text-rose-900'
           }`}>
-            <div className="flex items-center gap-2 mb-1.5 font-black text-sm">
+            <div className="flex items-center gap-2 mb-1 font-black text-sm">
               {selectedAnswer === currentQuestion.respuestaCorrecta ? (
                 <>
                   <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                  <span>¡Respuesta correcta! (+10 XP)</span>
+                  <span>¡Excelente! Respuesta correcta (+10 XP)</span>
                 </>
               ) : (
                 <>
@@ -364,9 +387,9 @@ const PracticeQuestionScreen: React.FC = () => {
             </div>
 
             {currentQuestion.explicacion && (
-              <div className="mt-2 text-xs leading-relaxed text-slate-700 bg-white/80 p-2.5 rounded-xl">
-                <strong className="block text-[#183153] mb-0.5 flex items-center gap-1 font-black">
-                  <Lightbulb className="w-3.5 h-3.5 text-amber-500" /> Explicación:
+              <div className="mt-2 text-xs leading-relaxed text-slate-700 bg-white/80 p-3 rounded-2xl border border-white/60">
+                <strong className="block text-[#183153] mb-1 flex items-center gap-1 font-black">
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-500" /> Fundamentación académica:
                 </strong>
                 {currentQuestion.explicacion}
               </div>
@@ -375,21 +398,21 @@ const PracticeQuestionScreen: React.FC = () => {
         )}
       </div>
 
-      {/* Bottom Action Bar */}
-      <div className="p-4 bg-white/95 backdrop-blur-md border-t border-slate-100 sticky bottom-0 z-30">
+      {/* Bottom Floating Bar */}
+      <div className="p-4 bg-white/95 backdrop-blur-md border-t border-slate-100 sticky bottom-0 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
         <div className="max-w-[430px] mx-auto">
           {isAnswerLocked ? (
             <button
               onClick={handleNext}
-              className="w-full py-4 px-6 rounded-2xl text-white font-black text-sm shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95"
+              className="w-full py-4 px-6 rounded-2xl text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
               style={{ backgroundColor: activeCourse.colorHex }}
             >
               <span>{isLastQuestion ? 'Finalizar y Ver Resultados 🎉' : 'Siguiente pregunta'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           ) : (
-            <div className="text-center py-2 text-xs font-bold text-slate-400">
-              Selecciona una alternativa para continuar
+            <div className="text-center py-2 text-xs font-bold text-slate-400 flex items-center justify-center gap-1.5">
+              <span>Toca una alternativa para validar</span>
             </div>
           )}
         </div>

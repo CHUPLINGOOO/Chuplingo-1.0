@@ -8,6 +8,16 @@ export type CourseId =
   | 'ingles' 
   | 'biologia';
 
+export type UniversityTarget = 
+  | 'todas' 
+  | 'unmsm' 
+  | 'uni' 
+  | 'unsa' 
+  | 'unfv' 
+  | 'unsaac' 
+  | 'unac' 
+  | 'pucp';
+
 export type PracticeMode = 'rapida' | 'estandar' | 'intensiva' | 'errores' | 'favoritos' | 'simulacro' | 'tema';
 
 export type QuestionDifficulty = 'basico' | 'intermedio' | 'avanzado';
@@ -38,6 +48,7 @@ export interface Question {
   officialExamQuestion?: boolean;
   questionType?: string;
   dificultad: QuestionDifficulty;
+  universityTag?: string;
   active?: boolean;
   tags?: string[];
 }
@@ -132,6 +143,7 @@ export interface NotificationItem {
   tipo: 'racha' | 'desafio' | 'logro' | 'sistema' | 'suscripcion';
   leido: boolean;
   fecha: string;
+  actionUrl?: string;
 }
 
 export interface UserPreferences {

@@ -3,14 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { COURSES } from '../data/coursesData';
 import { AppHeader } from '../components/layout/AppHeader';
 import { useChuplingo } from '../context/ChuplingoContext';
-import { PracticeMode, CourseId, QuestionDifficulty } from '../types/chuplingo';
-import { Zap, Target, Flame, AlertCircle, Star, Sparkles, Check, ArrowRight, Timer } from 'lucide-react';
+import { PracticeMode, CourseId, UniversityTarget } from '../types/chuplingo';
+import { Zap, Target, Flame, AlertCircle, Star, GraduationCap, Check, ArrowRight, Timer, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PracticeSetup: React.FC = () => {
   const { courseId: paramCourseId, topicId: paramTopicId } = useParams<{ courseId?: string; topicId?: string }>();
   const navigate = useNavigate();
-  const { mistakes, favoriteQuestionIds, user } = useChuplingo();
+  const { mistakes, favoriteQuestionIds } = useChuplingo();
 
   const [selectedCourseId, setSelectedCourseId] = useState<CourseId>(
     (paramCourseId as CourseId) || 'literatura'
@@ -20,17 +20,28 @@ const PracticeSetup: React.FC = () => {
   );
   const [selectedMode, setSelectedMode] = useState<PracticeMode>('rapida');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('todas');
+  const [selectedUniversity, setSelectedUniversity] = useState<UniversityTarget>('todas');
 
   const activeCourse = COURSES.find((c) => c.id === selectedCourseId) || COURSES[0];
   const activeMistakesCount = mistakes.filter((m) => !m.dominada).length;
   const favoritesCount = favoriteQuestionIds.length;
+
+  const universities = [
+    { id: 'todas', label: 'Todas las Universidades' },
+    { id: 'unmsm', label: 'UNMSM (San Marcos)' },
+    { id: 'uni', label: 'UNI (Ingeniería)' },
+    { id: 'unsa', label: 'UNSA (Arequipa)' },
+    { id: 'unfv', label: 'UNFV (Villareal)' },
+    { id: 'unsaac', label: 'UNSAAC (Cusco)' },
+    { id: 'pucp', label: 'PUCP (Católica)' }
+  ];
 
   const modes = [
     {
       id: 'rapida' as PracticeMode,
       title: 'Práctica rápida',
       count: 10,
-      description: '10 preguntas para un repaso ágil y mantener la racha.',
+      description: '10 preguntas para mantener tu racha activa en 5 min.',
       icon: Zap,
       badge: '10 preguntas',
       color: '#12B7E8'
@@ -39,7 +50,7 @@ const PracticeSetup: React.FC = () => {
       id: 'estandar' as PracticeMode,
       title: 'Práctica estándar',
       count: 20,
-      description: '20 preguntas con dificultad progresiva.',
+      description: '20 preguntas para afianzar conceptos clave.',
       icon: Target,
       badge: '20 preguntas',
       color: '#FF9418'
@@ -48,7 +59,7 @@ const PracticeSetup: React.FC = () => {
       id: 'intensiva' as PracticeMode,
       count: 30,
       title: 'Práctica intensiva',
-      description: '30 preguntas para afianzar retención máxima.',
+      description: '30 preguntas tipo examen para máxima retención.',
       icon: Flame,
       badge: '30 preguntas',
       color: '#F05C54'
@@ -57,14 +68,14 @@ const PracticeSetup: React.FC = () => {
       id: 'simulacro' as PracticeMode,
       count: 25,
       title: 'Simulacro Tipo Admisión',
-      description: 'Preguntas aleatorias de los 8 cursos con temporizador.',
+      description: '25 preguntas cronometradas de los 8 cursos preuniversitarios.',
       icon: Timer,
       badge: 'Simulacro VIP',
       color: '#7354D9'
     },
     {
       id: 'errores' as PracticeMode,
-      title: 'Repasar errores',
+      title: 'Repasar mis errores',
       count: activeMistakesCount,
       description: `Entrena las preguntas que fallaste (${activeMistakesCount} pendientes).`,
       icon: AlertCircle,
@@ -76,7 +87,7 @@ const PracticeSetup: React.FC = () => {
       id: 'favoritos' as PracticeMode,
       title: 'Preguntas guardadas',
       count: favoritesCount,
-      description: `Practica tu banco de favoritas (${favoritesCount} guardadas).`,
+      description: `Practica tu colección personal (${favoritesCount} guardadas).`,
       icon: Star,
       badge: `${favoritesCount} guardadas`,
       color: '#F5A623',
@@ -89,7 +100,8 @@ const PracticeSetup: React.FC = () => {
       course: selectedCourseId,
       topic: selectedTopicId,
       mode: selectedMode,
-      difficulty: selectedDifficulty
+      difficulty: selectedDifficulty,
+      university: selectedUniversity
     });
 
     navigate(`/practice?${query.toString()}`);
@@ -98,19 +110,40 @@ const PracticeSetup: React.FC = () => {
   return (
     <div className="flex flex-col gap-4">
       <AppHeader
-        title="Seleccionar Práctica"
-        subtitle="Configura tu sesión de estudio"
+        title="Personalizar Práctica"
+        subtitle="Elige universidad, curso y modalidad"
         iconEmoji="🎯"
         showBack={true}
         bgGradient={activeCourse.bgGradient}
       />
 
       <div className="px-4 flex flex-col gap-4">
-        {/* Course selector (hidden during multi-course simulacro) */}
+        {/* University Exam Filter */}
+        {selectedMode !== 'simulacro' && selectedMode !== 'errores' && selectedMode !== 'favoritos' && (
+          <div>
+            <label className="text-xs font-black text-[#183153] uppercase tracking-wide flex items-center gap-1.5 mb-2">
+              <Building2 className="w-3.5 h-3.5 text-[#183153]" />
+              <span>Universidad Objetivo</span>
+            </label>
+            <select
+              value={selectedUniversity}
+              onChange={(e) => setSelectedUniversity(e.target.value as UniversityTarget)}
+              className="w-full bg-white border border-slate-200 rounded-2xl p-3.5 text-xs font-black text-[#183153] focus:outline-none focus:ring-2 focus:ring-[#F05C54] shadow-2xs"
+            >
+              {universities.map((u) => (
+                <option key={u.id} value={u.id}>
+                  🏛️ {u.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Course selector */}
         {selectedMode !== 'simulacro' && selectedMode !== 'errores' && selectedMode !== 'favoritos' && (
           <div>
             <label className="text-xs font-black text-[#183153] uppercase tracking-wide block mb-2">
-              Curso
+              Curso Preuniversitario
             </label>
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
               {COURSES.map((course) => {
@@ -124,7 +157,7 @@ const PracticeSetup: React.FC = () => {
                     }}
                     className={`px-3 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border ${
                       isSelected
-                        ? 'bg-[#183153] text-white border-[#183153] shadow-sm'
+                        ? 'bg-[#183153] text-white border-[#183153] shadow-xs'
                         : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                     }`}
                   >
@@ -144,14 +177,14 @@ const PracticeSetup: React.FC = () => {
         {selectedMode !== 'simulacro' && selectedMode !== 'errores' && selectedMode !== 'favoritos' && (
           <div>
             <label className="text-xs font-black text-[#183153] uppercase tracking-wide block mb-2">
-              Tema
+              Tema Específico
             </label>
             <select
               value={selectedTopicId}
               onChange={(e) => setSelectedTopicId(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-2xl p-3.5 text-xs font-bold text-[#183153] focus:outline-none focus:ring-2 focus:ring-[#F05C54]"
+              className="w-full bg-white border border-slate-200 rounded-2xl p-3.5 text-xs font-bold text-[#183153] focus:outline-none focus:ring-2 focus:ring-[#F05C54] shadow-2xs"
             >
-              <option value="all">Todos los temas de {activeCourse.nombre}</option>
+              <option value="all">📚 Todos los temas de {activeCourse.nombre}</option>
               {activeCourse.temas.map((topic) => (
                 <option key={topic.id} value={topic.id}>
                   Tema {String(topic.numero).padStart(2, '0')}: {topic.nombre}
@@ -209,7 +242,7 @@ const PracticeSetup: React.FC = () => {
                     }
                     setSelectedMode(mode.id);
                   }}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                  className={`p-3.5 rounded-3xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                     mode.disabled
                       ? 'opacity-45 bg-slate-50 border-slate-200 cursor-not-allowed'
                       : isSelected
@@ -222,7 +255,7 @@ const PracticeSetup: React.FC = () => {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div 
-                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                      className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs"
                       style={{ 
                         backgroundColor: `${mode.color}15`,
                         color: mode.color 
@@ -235,7 +268,7 @@ const PracticeSetup: React.FC = () => {
                       <h4 className="text-sm font-black text-[#183153] truncate">
                         {mode.title}
                       </h4>
-                      <p className="text-[11px] text-slate-500 line-clamp-1">
+                      <p className="text-[11px] text-slate-500 line-clamp-1 font-medium">
                         {mode.description}
                       </p>
                     </div>
@@ -243,7 +276,7 @@ const PracticeSetup: React.FC = () => {
 
                   <div className="flex items-center gap-2 shrink-0">
                     <span 
-                      className="text-[10px] font-black px-2 py-1 rounded-lg"
+                      className="text-[10px] font-black px-2.5 py-1 rounded-xl"
                       style={{ 
                         backgroundColor: `${mode.color}15`,
                         color: mode.color 
@@ -268,10 +301,10 @@ const PracticeSetup: React.FC = () => {
         </div>
 
         {/* Start Button */}
-        <div className="pt-3 pb-4">
+        <div className="pt-2 pb-5">
           <button
             onClick={handleStart}
-            className="w-full py-4 px-6 rounded-2xl text-white font-black text-sm shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95"
+            className="w-full py-4 px-6 rounded-2xl text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95"
             style={{ backgroundColor: activeCourse.colorHex }}
           >
             <span>Iniciar Práctica Ahora</span>
