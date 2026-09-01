@@ -5,7 +5,7 @@ import { useChuplingo } from '../context/ChuplingoContext';
 import { CHUPLINGO_PLANS } from '../data/plansData';
 import { PlanId } from '../types/chuplingo';
 import { ChuplingoMascot } from '../components/mascot/ChuplingoMascot';
-import { Check, Star, Zap, Shield, Sparkles, ArrowRight, QrCode, Upload, Clock, AlertCircle, X } from 'lucide-react';
+import { Check, Star, Zap, Shield, Sparkles, ArrowRight, Upload, Clock, AlertCircle, X, Phone, Hash, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PlansScreen: React.FC = () => {
@@ -201,7 +201,7 @@ const PlansScreen: React.FC = () => {
                 ) : (
                   <button
                     onClick={() => handleSelectPlan(plan)}
-                    className="w-full py-3.5 px-4 rounded-2xl font-black text-xs shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 text-white"
+                    className="w-full py-3.5 px-4 rounded-2xl font-black text-xs shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 text-white cursor-pointer"
                     style={{ backgroundColor: plan.colorHex }}
                   >
                     <span>{plan.precio === 0 ? 'Seleccionar Plan Gratis' : `Yapear y activar ${plan.nombre}`}</span>
@@ -214,74 +214,88 @@ const PlansScreen: React.FC = () => {
         })}
       </div>
 
-      {/* Modern Yape Checkout Modal: Elevado arriba y con scroll optimizado */}
+      {/* Modal de Pago Yape optimizado arriba y 100% visible */}
       {selectedPlanForModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-start justify-center z-50 p-4 pt-6 sm:pt-10 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-5 border border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col gap-3 my-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b dark:border-slate-800 pb-2.5">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[999] flex items-start justify-center p-3 pt-3 sm:pt-6 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-4 sm:p-5 border border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col gap-3 my-0">
+            {/* Header del modal */}
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
               <div className="flex items-center gap-2">
-                <span className="text-2xl">🦜</span>
+                <span className="text-2xl">📱</span>
                 <div>
-                  <h3 className="text-sm font-black text-[#183153] dark:text-white">Pagar con Yape</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Plan {selectedPlanForModal.nombre}</p>
+                  <h3 className="text-sm font-black text-[#183153] dark:text-white leading-tight">Pagar con Yape</h3>
+                  <p className="text-[11px] font-bold text-purple-600 dark:text-purple-400">Plan {selectedPlanForModal.nombre}</p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedPlanForModal(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-300"
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
+                aria-label="Cerrar modal"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Yape instructions card */}
-            <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-2xl p-3.5 flex flex-col gap-1.5 text-center text-purple-950 dark:text-purple-200">
-              <span className="text-xs font-bold text-purple-800 dark:text-purple-300">Yapea el monto exacto:</span>
-              <span className="text-3xl font-black text-purple-900 dark:text-purple-100">S/ {selectedPlanForModal.precio}.00</span>
-              <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-purple-100 dark:border-purple-900 mt-1 shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Número de Yape Oficial:</span>
-                <span className="text-base font-black text-[#183153] dark:text-white tracking-wide">968 839 074</span>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5 font-medium">Titular: Rufo H.</span>
+            {/* Tarjeta con los datos de Yape */}
+            <div className="bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 rounded-2xl p-3 text-center flex flex-col gap-1">
+              <span className="text-[11px] font-bold text-purple-800 dark:text-purple-300">
+                Monto exacto a transferir:
+              </span>
+              <span className="text-2xl font-black text-purple-900 dark:text-purple-100">
+                S/ {selectedPlanForModal.precio}.00
+              </span>
+              
+              <div className="bg-white dark:bg-slate-800 py-2 px-3 rounded-xl border border-purple-100 dark:border-purple-900 mt-1 shadow-2xs flex items-center justify-between">
+                <div className="text-left">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Yape Oficial:</span>
+                  <span className="text-sm font-black text-[#183153] dark:text-white tracking-wider font-mono">968 839 074</span>
+                </div>
+                <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/60 px-2 py-0.5 rounded-lg">
+                  Rufo H.
+                </span>
               </div>
             </div>
 
-            {/* Form to submit proof */}
+            {/* Formulario para registrar comprobante */}
             <form onSubmit={handleSendPaymentProof} className="flex flex-col gap-2.5">
               <div>
-                <label className="text-[11px] font-black text-[#183153] dark:text-slate-200 uppercase tracking-wide block mb-1">
-                  Número de Operación Yape
+                <label className="text-[11px] font-black text-[#183153] dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 mb-1">
+                  <Hash className="w-3.5 h-3.5 text-purple-500" />
+                  <span>Número de Operación Yape</span>
                 </label>
                 <input
                   type="text"
                   placeholder="Ej: 14892018"
                   value={operationNumber}
                   onChange={(e) => setOperationNumber(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-[#183153] dark:text-white"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-[#183153] dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-black text-[#183153] dark:text-slate-200 uppercase tracking-wide block mb-1">
-                  Teléfono con el que yapeaste
+                <label className="text-[11px] font-black text-[#183153] dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 mb-1">
+                  <Phone className="w-3.5 h-3.5 text-purple-500" />
+                  <span>Teléfono con el que yapeaste</span>
                 </label>
                 <input
                   type="tel"
                   placeholder="Ej: 999 888 777"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-[#183153] dark:text-white"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-[#183153] dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-black text-[#183153] dark:text-slate-200 uppercase tracking-wide block mb-1">
-                  Comprobante / Captura (Opcional)
+                <label className="text-[11px] font-black text-[#183153] dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 mb-1">
+                  <ImageIcon className="w-3.5 h-3.5 text-purple-500" />
+                  <span>Captura de comprobante (Opcional)</span>
                 </label>
-                <label className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-purple-400 rounded-xl p-2.5 text-center cursor-pointer flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800">
-                  <Upload className="w-4 h-4 text-purple-500" />
-                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate max-w-[200px]">
-                    {proofFile ? proofFile.name : 'Subir captura'}
+                <label className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-purple-400 rounded-xl p-2.5 text-center cursor-pointer flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800 transition-colors">
+                  <Upload className="w-4 h-4 text-purple-500 shrink-0" />
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate max-w-[220px]">
+                    {proofFile ? proofFile.name : 'Adjuntar imagen o captura'}
                   </span>
                   <input
                     type="file"
@@ -292,13 +306,13 @@ const PlansScreen: React.FC = () => {
                 </label>
               </div>
 
-              {/* Botón de envío siempre visible y destacado */}
+              {/* Botón principal de envío destacado */}
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#7354D9] to-[#9176EA] hover:from-[#603EC8] hover:to-[#7E61DD] disabled:opacity-60 text-white font-black text-xs shadow-lg mt-1 flex items-center justify-center gap-1.5 transition-transform active:scale-95"
+                className="w-full mt-1 py-3.5 rounded-2xl bg-gradient-to-r from-[#7354D9] to-[#9176EA] hover:from-[#603EC8] hover:to-[#7E61DD] disabled:opacity-60 text-white font-black text-xs shadow-lg flex items-center justify-center gap-1.5 transition-transform active:scale-95 cursor-pointer"
               >
-                <span>{isSubmitting ? 'Enviando comprobante...' : 'Confirmar y Enviar Comprobante'}</span>
+                <span>{isSubmitting ? 'Enviando comprobante...' : 'Enviar y Activar Suscripción'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
