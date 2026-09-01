@@ -58,7 +58,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
                   {course.nombre}
                 </h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-300 shrink-0">
-                  {questionsInCourse} preguntas
+                  {questionsInCourse.toLocaleString()} preguntas
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-300 mt-1 line-clamp-2 leading-relaxed font-medium">
