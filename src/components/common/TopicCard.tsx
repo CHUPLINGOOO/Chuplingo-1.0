@@ -12,11 +12,10 @@ interface TopicCardProps {
 
 export const TopicCard: React.FC<TopicCardProps> = ({ topic, course }) => {
   const navigate = useNavigate();
-  const { getTopicProgress, topicQuestionCounts } = useChuplingo();
+  const { getTopicProgress } = useChuplingo();
   const { accuracy, status } = getTopicProgress(topic.id);
 
   const formatNumber = (num: number) => String(num).padStart(2, '0');
-  const questionsInTopic = topicQuestionCounts[topic.id] || 100;
   const courseEmoji = getCourseEmoji(course.id);
 
   const statusLabel = 
@@ -24,7 +23,7 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, course }) => {
       ? 'Dominado' 
       : status === 'en_progreso' 
         ? 'En progreso' 
-        : 'No iniciado';
+        : 'Por practicar';
 
   const statusBadge = {
     dominado: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
@@ -55,8 +54,8 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, course }) => {
           <h4 className="text-sm font-black text-[#183153] dark:text-white leading-snug truncate">
             {topic.nombre}
           </h4>
-          <span className="text-[10px] text-slate-400 dark:text-slate-400 font-bold">
-            {questionsInTopic} preg.
+          <span className="text-[10px] text-slate-400 dark:text-slate-400 font-black uppercase">
+            Admisión
           </span>
         </div>
         

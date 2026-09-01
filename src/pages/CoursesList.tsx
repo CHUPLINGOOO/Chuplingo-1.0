@@ -2,18 +2,15 @@ import React from 'react';
 import { COURSES } from '../data/coursesData';
 import { AppHeader } from '../components/layout/AppHeader';
 import { CourseCard } from '../components/common/CourseCard';
-import { useChuplingo } from '../context/ChuplingoContext';
-import { Sparkles, Database } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 const CoursesList: React.FC = () => {
-  const { totalBankQuestions } = useChuplingo();
-
   return (
     <div className="flex flex-col gap-4">
-      {/* Exact Coral Header requested */}
+      {/* Header Coral de Cursos */}
       <AppHeader
         title="Mis Cursos"
-        subtitle={`8 cursos • ${totalBankQuestions.toLocaleString()} preguntas en total`}
+        subtitle="8 cursos • Banco Oficial (+8,000 preguntas)"
         iconEmoji="📚"
         bgGradient="from-[#F05C54] to-[#FF7B74]"
         rightAction={

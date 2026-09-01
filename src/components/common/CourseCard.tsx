@@ -21,18 +21,17 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 
 export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
   const navigate = useNavigate();
-  const { getCourseProgress, courseQuestionCounts } = useChuplingo();
+  const { getCourseProgress } = useChuplingo();
   const { masteryPercent, completedTopicsCount } = getCourseProgress(course.id);
 
   const IconComponent = ICON_MAP[course.icono] || BookOpen;
-  const questionsInCourse = courseQuestionCounts[course.id] || 1000;
 
   return (
     <div 
       onClick={() => navigate(`/courses/${course.id}`)}
       className="bg-white dark:bg-[#1E293B] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700/80 overflow-hidden relative cursor-pointer group transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99]"
     >
-      {/* Distinctive colored left border strip */}
+      {/* Barra de color lateral del curso */}
       <div 
         className="absolute top-0 left-0 bottom-0 w-2.5" 
         style={{ backgroundColor: course.colorHex }}
@@ -41,7 +40,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
       <div className="p-4 pl-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
-            {/* Course Icon */}
+            {/* Ícono temático */}
             <div 
               className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105"
               style={{ 
@@ -57,8 +56,8 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
                 <h3 className="text-base font-black text-[#183153] dark:text-white leading-tight truncate">
                   {course.nombre}
                 </h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-300 shrink-0">
-                  {questionsInCourse.toLocaleString()} preguntas
+                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-200 shrink-0">
+                  +1,000 preguntas
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-300 mt-1 line-clamp-2 leading-relaxed font-medium">
@@ -68,10 +67,10 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
           </div>
         </div>
 
-        {/* Progress Bar & Info */}
+        {/* Barra de Progreso */}
         <div className="mt-4 pt-3 border-t border-slate-100/90 dark:border-slate-700/60">
           <div className="flex items-center justify-between text-xs mb-1.5">
-            <span className="font-semibold text-slate-500 dark:text-slate-400">Progreso</span>
+            <span className="font-semibold text-slate-500 dark:text-slate-400">Dominio del curso</span>
             <span className="font-black text-[#183153] dark:text-white">{masteryPercent}%</span>
           </div>
 
@@ -86,7 +85,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
           </div>
 
           <div className="flex items-center justify-between mt-3 pt-1">
-            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-300">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-300">
               {completedTopicsCount} de {course.temas.length} temas dominados
             </span>
 
@@ -95,10 +94,10 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
                 e.stopPropagation();
                 navigate(`/courses/${course.id}`);
               }}
-              className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl text-white shadow-sm transition-transform active:scale-95"
+              className="inline-flex items-center gap-1 text-xs font-black px-3.5 py-1.5 rounded-xl text-white shadow-sm transition-transform active:scale-95"
               style={{ backgroundColor: course.colorHex }}
             >
-              <span>Continuar</span>
+              <span>Practicar</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>

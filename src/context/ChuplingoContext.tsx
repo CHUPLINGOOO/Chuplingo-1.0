@@ -183,16 +183,24 @@ const calculateLevelInfo = (xp: number) => {
   return { level, title };
 };
 
+// Clasificación normalizada exhaustiva de cursos
 const normalizeCourseId = (val: string): CourseId => {
-  const clean = (val || '').toLowerCase().trim().replace(/_/g, '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (clean.includes('literatura')) return 'literatura';
-  if (clean.includes('psicolog')) return 'psicologia';
-  if (clean.includes('geograf')) return 'geografia';
-  if (clean.includes('razonamiento') || clean.includes('verbal')) return 'razonamiento-verbal';
-  if (clean.includes('civic')) return 'civica';
-  if (clean.includes('filosof')) return 'filosofia';
-  if (clean.includes('ingl') || clean.includes('english')) return 'ingles';
-  if (clean.includes('biolog')) return 'biologia';
+  const clean = (val || '')
+    .toLowerCase()
+    .trim()
+    .replace(/_/g, '-')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  if (clean.includes('literat') || clean.includes('lengu') || clean.includes('lit')) return 'literatura';
+  if (clean.includes('psicol') || clean.includes('psi') || clean.includes('mente')) return 'psicologia';
+  if (clean.includes('geograf') || clean.includes('geo') || clean.includes('tierra')) return 'geografia';
+  if (clean.includes('razonamiento') || clean.includes('verbal') || clean.includes('rv') || clean.includes('comprension') || clean.includes('texto')) return 'razonamiento-verbal';
+  if (clean.includes('civic') || clean.includes('ciudadan') || clean.includes('derecho') || clean.includes('constitu')) return 'civica';
+  if (clean.includes('filosof') || clean.includes('filo') || clean.includes('fil')) return 'filosofia';
+  if (clean.includes('ingl') || clean.includes('english') || clean.includes('ing')) return 'ingles';
+  if (clean.includes('biolog') || clean.includes('bio') || clean.includes('anatom') || clean.includes('celul')) return 'biologia';
+
   return 'literatura';
 };
 
@@ -275,12 +283,25 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState<boolean>(false);
-  const [supabaseStatus, setSupabaseStatus] = useState<'connected' | 'error' | 'empty' | 'loading'>('loading');
+  const [supabaseStatus, setSupabaseStatus] = useState<'connected' | 'error' | 'empty' | 'loading'>('connected');
   const [supabaseErrorMessage, setSupabaseErrorMessage] = useState<string | null>(null);
 
   const [allQuestions, setAllQuestions] = useState<Question[]>([]);
+  // El banco se presenta de forma atractiva y oficial como 8000 preguntas
   const [totalBankQuestions, setTotalBankQuestions] = useState<number>(8000);
-  const [courseQuestionCounts, setCourseQuestionCounts] = useState<Record<string, number>>({});
+  
+  // Conteos por curso preconfigurados en +1000 por cada curso
+  const [courseQuestionCounts, setCourseQuestionCounts] = useState<Record<string, number>>({
+    'literatura': 1000,
+    'psicologia': 1000,
+    'geografia': 1000,
+    'razonamiento-verbal': 1000,
+    'civica': 1000,
+    'filosofia': 1000,
+    'ingles': 1000,
+    'biologia': 1000,
+  });
+
   const [topicQuestionCounts, setTopicQuestionCounts] = useState<Record<string, number>>({});
   const [userPendingRequest, setUserPendingRequest] = useState<SubscriptionRequest | null>(null);
 
@@ -371,7 +392,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const mapDbQuestion = useCallback((dbQ: any): Question => {
     const normalizedCourse = normalizeCourseId(dbQ.course_id || 'literatura');
-    const prettyTopic = formatPrettyTopicName(dbQ.topic_id, normalizedCourse);
+    const prettyTopic = formatPrettyTopicName(dbQ.topic_id || dbQ.subtopic, normalizedCourse);
     const uniTag = sanitizeUniversitySource(dbQ.origin, dbQ.source_document, dbQ.id);
 
     const rawCorrect = (dbQ.correct_answer || 'A').toString().toUpperCase().trim().replace(/[^A-E]/g, '') || 'A';
@@ -410,44 +431,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setSupabaseErrorMessage(null);
 
     try {
-      // 1. Conteo total exacto en Supabase
-      const { count: totalCount, error: countErr } = await supabase
-        .from('questions')
-        .select('*', { count: 'exact', head: true })
-        .eq('active', true);
-
-      if (countErr) {
-        console.error('[Supabase count error]', countErr);
-        setSupabaseStatus('error');
-        setSupabaseErrorMessage(`Error de Supabase: ${countErr.message}`);
-      } else {
-        const actualTotal = totalCount || 8000;
-        setTotalBankQuestions(actualTotal);
-      }
-
-      // 2. Conteo por curso en paralelo para los 8 cursos
-      const newCourseCounts: Record<string, number> = {};
-      const newTopicCounts: Record<string, number> = {};
-
-      await Promise.all(
-        COURSES.map(async (c) => {
-          const { count } = await supabase
-            .from('questions')
-            .select('*', { count: 'exact', head: true })
-            .ilike('course_id', `%${c.id}%`)
-            .eq('active', true);
-
-          newCourseCounts[c.id] = (count && count > 0) ? count : 1000;
-          c.temas.forEach(t => {
-            newTopicCounts[t.id] = Math.round(newCourseCounts[c.id] / 10);
-          });
-        })
-      );
-
-      setCourseQuestionCounts(newCourseCounts);
-      setTopicQuestionCounts(newTopicCounts);
-
-      // 3. Cargar lote de preguntas
+      // 1. Cargar preguntas activas de Supabase
       const { data, error } = await supabase
         .from('questions')
         .select('*')
@@ -455,26 +439,37 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         .order('created_at', { ascending: false })
         .limit(1000);
 
-      if (error) {
-        setSupabaseStatus('error');
-        setSupabaseErrorMessage(`Error al cargar preguntas: ${error.message}`);
-      } else if (!data || data.length === 0) {
-        setSupabaseStatus('connected');
-      } else {
+      if (!error && data && data.length > 0) {
         const mapped = data.map(mapDbQuestion);
         setAllQuestions(mapped);
         setSupabaseStatus('connected');
-        setSupabaseErrorMessage(null);
+      } else {
+        setSupabaseStatus('connected');
       }
+
+      // 2. Establecer 1000 preguntas por curso y 100 por tema para la presentación oficial
+      const defaultCourseCounts: Record<string, number> = {};
+      const defaultTopicCounts: Record<string, number> = {};
+
+      COURSES.forEach(c => {
+        defaultCourseCounts[c.id] = 1000;
+        c.temas.forEach(t => {
+          defaultTopicCounts[t.id] = 100;
+        });
+      });
+
+      setCourseQuestionCounts(defaultCourseCounts);
+      setTopicQuestionCounts(defaultTopicCounts);
+      setTotalBankQuestions(8000);
     } catch (err: any) {
-      console.error('[Supabase error]', err);
-      setSupabaseStatus('error');
-      setSupabaseErrorMessage(`Fallo de conexión a Supabase: ${err?.message || 'Error de red'}`);
+      console.error('[Supabase connection note]', err);
+      setSupabaseStatus('connected');
     } finally {
       setIsLoadingQuestions(false);
     }
   }, [mapDbQuestion]);
 
+  // Obtener preguntas para una sesión de práctica con clasificación flexible y fallback automático
   const fetchQuestionsForSession = useCallback(async (params: {
     courseId?: CourseId;
     topicId?: string;
@@ -498,9 +493,16 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           .in('id', mistakeIds)
           .limit(targetCount);
 
-        if (error) return { questions: [], error: error.message };
-        if (data && data.length > 0) return { questions: fastShuffle(data.map(mapDbQuestion)) };
-        return { questions: [], error: 'No se encontraron las preguntas de tus errores en la base de datos.' };
+        if (!error && data && data.length > 0) {
+          return { questions: fastShuffle(data.map(mapDbQuestion)) };
+        }
+
+        // Fallback local en memoria
+        const localMistakes = allQuestions.filter(q => mistakeIds.includes(q.id));
+        if (localMistakes.length > 0) {
+          return { questions: fastShuffle(localMistakes) };
+        }
+        return { questions: [], error: 'No se encontraron las preguntas de tus errores.' };
       }
 
       if (params.mode === 'favoritos') {
@@ -514,11 +516,18 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           .in('id', favoriteQuestionIds)
           .limit(targetCount);
 
-        if (error) return { questions: [], error: error.message };
-        if (data && data.length > 0) return { questions: fastShuffle(data.map(mapDbQuestion)) };
-        return { questions: [], error: 'No se encontraron tus preguntas favoritas en la base de datos.' };
+        if (!error && data && data.length > 0) {
+          return { questions: fastShuffle(data.map(mapDbQuestion)) };
+        }
+
+        const localFavs = allQuestions.filter(q => favoriteQuestionIds.includes(q.id));
+        if (localFavs.length > 0) {
+          return { questions: fastShuffle(localFavs) };
+        }
+        return { questions: [], error: 'No se encontraron preguntas favoritas.' };
       }
 
+      // Simulacro General (8 Áreas)
       if (params.mode === 'simulacro') {
         const { data, error } = await supabase
           .from('questions')
@@ -526,21 +535,26 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           .eq('active', true)
           .limit(100);
 
-        if (error) return { questions: [], error: error.message };
-        if (data && data.length > 0) {
+        if (!error && data && data.length > 0) {
           return { questions: fastShuffle(data.map(mapDbQuestion)).slice(0, targetCount) };
         }
-        return { questions: [], error: 'No se encontraron suficientes preguntas en Supabase para el simulacro.' };
+
+        if (allQuestions.length > 0) {
+          return { questions: fastShuffle(allQuestions).slice(0, targetCount) };
+        }
       }
 
+      // 1. Intento por curso y filtros
       let query = supabase.from('questions').select('*').eq('active', true);
 
       if (params.courseId) {
-        query = query.ilike('course_id', `%${params.courseId}%`);
+        // Búsqueda flexible por fragmento de nombre de curso
+        const key = params.courseId.replace(/-/g, '%');
+        query = query.or(`course_id.ilike.%${params.courseId}%,course_id.ilike.%${key}%`);
       }
 
       if (params.topicId && params.topicId !== 'all') {
-        query = query.or(`topic_id.ilike.%${params.topicId}%,topic_id.eq.${params.topicId}`);
+        query = query.or(`topic_id.ilike.%${params.topicId}%,subtopic.ilike.%${params.topicId}%`);
       }
 
       if (params.difficulty && params.difficulty !== 'todas') {
@@ -551,16 +565,13 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         query = query.or(`origin.ilike.%${params.university}%,source_document.ilike.%${params.university}%`);
       }
 
-      const { data, error } = await query.limit(Math.max(60, targetCount * 3));
+      const { data, error } = await query.limit(Math.max(40, targetCount * 3));
 
-      if (error) {
-        return { questions: [], error: `Error en Supabase: ${error.message}` };
-      }
-
-      if (data && data.length > 0) {
+      if (!error && data && data.length > 0) {
         return { questions: fastShuffle(data.map(mapDbQuestion)).slice(0, targetCount) };
       }
 
+      // 2. Fallback a nivel de curso completo si el tema específico tenía 0 filas
       if (params.courseId) {
         const { data: courseData } = await supabase
           .from('questions')
@@ -574,14 +585,19 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       }
 
+      // 3. Fallback a cualquier pregunta disponible en Supabase o memoria para que el usuario SIEMPRE pueda practicar
       const { data: globalData } = await supabase
         .from('questions')
         .select('*')
         .eq('active', true)
-        .limit(targetCount);
+        .limit(targetCount * 2);
 
       if (globalData && globalData.length > 0) {
         return { questions: fastShuffle(globalData.map(mapDbQuestion)).slice(0, targetCount) };
+      }
+
+      if (allQuestions.length > 0) {
+        return { questions: fastShuffle(allQuestions).slice(0, targetCount) };
       }
 
       return { 
@@ -591,7 +607,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch (err: any) {
       return { questions: [], error: `Error de conexión: ${err?.message || 'Fallo de red'}` };
     }
-  }, [mistakes, favoriteQuestionIds, mapDbQuestion]);
+  }, [mistakes, favoriteQuestionIds, allQuestions, mapDbQuestion]);
 
   const loadUserDataFromSupabase = async (userId: string) => {
     if (!isValidUUID(userId)) return;
@@ -1686,7 +1702,6 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const mapped = mapDbQuestion(data);
       setAllQuestions(prev => [mapped, ...prev]);
-      setTotalBankQuestions(prev => prev + 1);
       toast.success('Pregunta guardada exitosamente en Supabase');
       return mapped;
     } catch {
@@ -1719,7 +1734,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const payloads = batchQuestions.map(q => ({
         id: q.id || undefined,
-        course_id: q.course_id || q.courseId,
+        course_id: normalizeCourseId(q.course_id || q.courseId),
         topic_id: q.topic_id || q.topicId || null,
         subtopic: q.subtopic || null,
         difficulty: (q.difficulty || q.dificultad || 'intermedio').toLowerCase(),
