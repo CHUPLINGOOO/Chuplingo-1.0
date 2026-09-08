@@ -30,25 +30,178 @@ import {
 import { toast } from 'sonner';
 
 function parseCSVToQuestions(csvText: string): any[] {
-  const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
+  // Parse CSV properly handling quoted fields with commas/newlines inside
+  const rows: any[] = [];
+  const lines: string[] = [];
+  let currentLine = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < csvText.length; i++) {
+    const char = csvText[i];
+    const nextChar = csvText[i + 1];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (nextChar === '"') {
+          currentLine += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        currentLine += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === '\n' || (char === '\r' && nextChar === '\n')) {
+        if (currentLine.trim().length > 0) {
+          lines.push(currentLine.trim());
+        }
+        currentLine = '';
+        if (char === '\r') i++;
+      } else if (char === ',') {
+        // delimiter at line level, but we're building lines
+        currentLine += char;
+      } else {
+        currentLine += char;
+      }
+    }
+  }
+
+  if (currentLine.trim().length > 0) {
+    lines.push(currentLine.trim());
+  }
 
   if (lines.length < 2) return [];
 
-  const headers = lines[0].split(',').map(h => h.trim());
-  const rows: any[] = [];
+  // Parse headers
+  const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+
+  // Column name mapping: map common variations to expected field names
+  const columnMap: Record<string, string> = {
+    // Course
+    'curso': 'course',
+    'curso_id': 'course_id',
+    'course': 'course',
+    'course_id': 'course_id',
+    // Topic
+    'tema': 'topic',
+    'tema_id': 'topic_id',
+    'topic': 'topic',
+    'topic_id': 'topic_id',
+    // Subtopic
+    'subtema': 'subtopic',
+    'subtopic': 'subtopic',
+    // Difficulty
+    'dificultad': 'difficulty',
+    'difficulty': 'difficulty',
+    'nivel': 'difficulty',
+    // Question type
+    'tipo_pregunta': 'question_type',
+    'question_type': 'question_type',
+    'tipo': 'question_type',
+    // Question
+    'pregunta': 'question',
+    'question': 'question',
+    'enunciado': 'question',
+    // Options
+    'opcion_a': 'option_a',
+    'alternativa_a': 'option_a',
+    'option_a': 'option_a',
+    'opcion_b': 'option_b',
+    'alternativa_b': 'option_b',
+    'option_b': 'option_b',
+    'opcion_c': 'option_c',
+    'alternativa_c': 'option_c',
+    'option_c': 'option_c',
+    'opcion_d': 'option_d',
+    'alternativa_d': 'option_d',
+    'option_d': 'option_d',
+    'opcion_e': 'option_e',
+    'alternativa_e': 'option_e',
+    'option_e': 'option_e',
+    // Correct answer
+    'respuesta_correcta': 'correct_answer',
+    'respuestacorrecta': 'correct_answer',
+    'correct_answer': 'correct_answer',
+    'respuesta': 'correct_answer',
+    // Explanation
+    'explicacion': 'explanation',
+    'explicación': 'explanation',
+    'explanation': 'explanation',
+    'justificacion': 'explanation',
+    'justificación': 'explanation',
+    // Source
+    'fuente': 'source_document',
+    'source_document': 'source_document',
+    'documento': 'source_document',
+    'pagina': 'source_page',
+    'source_page': 'source_page',
+    // Origin
+    'origen': 'origin',
+    'origin': 'origin',
+    'fuente_documento': 'origin',
+    // ID
+    'id': 'id',
+  };
+
+  // Build reverse map from normalized header to expected field
+  const normalizedHeaders = headers.map(h => {
+    const clean = h.replace(/['"]/g, '').toLowerCase().trim();
+    return columnMap[clean] || clean;
+  });
 
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim());
-
+    const values = parseCSVLine(lines[i]);
     const obj: any = {};
+
     headers.forEach((h, index) => {
-      obj[h] = values[index] || '';
+      const cleanHeader = h.replace(/['"]/g, '').toLowerCase().trim();
+      const mappedField = columnMap[cleanHeader] || cleanHeader;
+      obj[mappedField] = (values[index] || '').trim();
     });
 
     rows.push(obj);
   }
 
   return rows;
+}
+
+// Helper to parse a single CSV line respecting quotes
+function parseCSVLine(line: string): string[] {
+  const values: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (nextChar === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === ',') {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+  }
+  values.push(current.trim());
+  return values;
 }
 
 const COURSE_NAME_MAP: Record<string, CourseId> = {
@@ -59,14 +212,33 @@ const COURSE_NAME_MAP: Record<string, CourseId> = {
   'geografia': 'geografia',
   'razonamiento verbal': 'razonamiento-verbal',
   'razonamiento-verbal': 'razonamiento-verbal',
+  'razonamiento verbal': 'razonamiento-verbal',
+  'razonamiento': 'razonamiento-verbal',
+  'verbal': 'razonamiento-verbal',
+  'rv': 'razonamiento-verbal',
+  'comprension': 'razonamiento-verbal',
+  'texto': 'razonamiento-verbal',
   'cívica': 'civica',
   'civica': 'civica',
+  'ciudadana': 'civica',
+  'derecho': 'civica',
+  'constitución': 'civica',
   'filosofía': 'filosofia',
   'filosofia': 'filosofia',
+  'filo': 'filosofia',
+  'fil': 'filosofia',
   'inglés': 'ingles',
   'ingles': 'ingles',
+  'english': 'ingles',
   'biología': 'biologia',
-  'biologia': 'biologia'
+  'biologia': 'biologia',
+  'bio': 'biologia',
+  'anatomía': 'biologia',
+  'anatomia': 'biologia',
+  'celular': 'biologia',
+  'celula': 'biologia',
+  'ciencias': 'biologia',
+  'ciencia': 'biologia'
 };
 
 const AdminScreen: React.FC = () => {
@@ -247,14 +419,31 @@ const AdminScreen: React.FC = () => {
         parsedArray = parseCSVToQuestions(batchRawText);
       }
 
+      if (!Array.isArray(parsedArray) || parsedArray.length === 0) {
+        toast.error('No se encontraron preguntas en el archivo. Verifica el formato.');
+        setIsImporting(false);
+        return;
+      }
+
       const mapped = parsedArray.map(item => {
         const rawCourse = (item.course || item.course_id || '').toLowerCase().trim();
         const normalizedCourseId = COURSE_NAME_MAP[rawCourse] || 'literatura';
         
         let diff = (item.difficulty || item.dificultad || 'intermedio').toLowerCase().trim();
-        if (diff === 'básico' || diff === 'basico') diff = 'basico';
-        else if (diff === 'avanzado') diff = 'avanzado';
+        if (diff === 'básico' || diff === 'basico' || diff === '1' || diff === 'b1') diff = 'basico';
+        else if (diff === 'avanzado' || diff === 'avanzada' || diff === '3' || diff === 'c1') diff = 'avanzado';
         else diff = 'intermedio';
+
+        // Normalize question_type
+        let qType = (item.question_type || item.tipo_pregunta || 'completar_enunciado').toLowerCase().trim();
+        if (qType.includes('completar') || qType.includes('enunciado')) qType = 'completar_enunciado';
+        else if (qType.includes('verdadero') || qType.includes('falso') || qType.includes('v/f')) qType = 'verdadero_falso';
+        else if (qType.includes('asociar') || qType.includes('relacionar')) qType = 'asociar';
+        else if (qType.includes('seleccionar') || qType.includes('multiple')) qType = 'seleccion_multiple';
+
+        // Normalize correct_answer
+        let correctAns = (item.correct_answer || item.respuestaCorrecta || item.respuesta || 'A').toString().trim().toUpperCase();
+        if (!['A', 'B', 'C', 'D', 'E'].includes(correctAns)) correctAns = 'A';
 
         return {
           id: item.id || undefined,
@@ -262,22 +451,28 @@ const AdminScreen: React.FC = () => {
           topic_id: item.topic || item.topic_id || 'Tema General',
           subtopic: item.subtopic || null,
           difficulty: diff,
-          question_type: item.question_type || 'completar_enunciado',
-          question: item.question || item.pregunta,
-          option_a: item.option_a,
-          option_b: item.option_b,
-          option_c: item.option_c,
-          option_d: item.option_d,
-          option_e: item.option_e,
-          correct_answer: (item.correct_answer || item.respuestaCorrecta || 'A').toUpperCase().trim(),
-          explanation: item.explanation || item.explicacion || '',
-          source_document: item.source_document || null,
-          source_page: item.source_page || null,
-          origin: item.origin || 'pregunta_generada_a_partir_del_contenido_fuente',
+          question_type: qType,
+          question: item.question || item.pregunta || '',
+          option_a: item.option_a || item.alternativa_a || item.opcion_a || '',
+          option_b: item.option_b || item.alternativa_b || item.opcion_b || '',
+          option_c: item.option_c || item.alternativa_c || item.opcion_c || '',
+          option_d: item.option_d || item.alternativa_d || item.opcion_d || '',
+          option_e: item.option_e || item.alternativa_e || item.opcion_e || '',
+          correct_answer: correctAns,
+          explanation: item.explanation || item.explicacion || item.justificacion || '',
+          source_document: item.source_document || item.fuente || null,
+          source_page: item.source_page || item.pagina || null,
+          origin: item.origin || item.origen || 'pregunta_generada_a_partir_del_contenido_fuente',
           official_exam_question: false,
           active: true
         };
-      });
+      }).filter(p => p.question && p.option_a && p.option_b && p.option_c && p.option_d && p.option_e);
+
+      if (mapped.length === 0) {
+        toast.error('No se encontraron preguntas válidas con las 5 alternativas completas');
+        setIsImporting(false);
+        return;
+      }
 
       const count = await importQuestionsBatch(mapped);
       if (count > 0) {
