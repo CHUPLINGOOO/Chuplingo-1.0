@@ -31,7 +31,8 @@ const PracticeQuestionScreen: React.FC = () => {
     recordSession, 
     isLoadingQuestions,
     isOnline,
-    supabaseErrorMessage 
+    supabaseErrorMessage,
+    playSoundEffect
   } = useChuplingo();
 
   const courseParam = (searchParams.get('course') as CourseId) || 'literatura';
@@ -54,16 +55,18 @@ const PracticeQuestionScreen: React.FC = () => {
   const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
   const [secondsRemaining, setSecondsRemaining] = useState<number>(modeParam === 'simulacro' ? 1500 : 0);
   const [showExitModal, setShowExitModal] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   const loadSession = useCallback(async () => {
     setLoadError(null);
     setHasLoaded(false);
 
-    const questionsCount = 
-      modeParam === 'rapida' ? 10 :
-      modeParam === 'estandar' ? 20 :
-      modeParam === 'intensiva' ? 30 :
-      modeParam === 'simulacro' ? 25 : 10;
+    const questionsCount =
+          modeParam === 'simulacro' ? 25 :
+          modeParam === 'rapida' ? 10 :
+          modeParam === 'estandar' ? 20 :
+          modeParam === 'intensiva' ? 30 :
+          modeParam === 'ilimitado' ? 100 : 10;
 
     const result = await fetchQuestionsForSession({
       courseId: courseParam,
@@ -204,6 +207,13 @@ const PracticeQuestionScreen: React.FC = () => {
     const isCorrect = optId === currentQuestion.respuestaCorrecta;
     const timeSpent = Math.round((Date.now() - questionStartTime) / 1000);
 
+    // Reproducir efecto de sonido temático
+    if (isCorrect) {
+      playSoundEffect('correct');
+    } else {
+      playSoundEffect('error');
+    }
+
     const attempt: QuestionAttempt = {
       questionId: currentQuestion.id,
       courseId: currentQuestion.courseId,
@@ -224,28 +234,37 @@ const PracticeQuestionScreen: React.FC = () => {
     }
 
     if (isLastQuestion) {
-      const totalDuration = Math.round((Date.now() - startTime) / 1000);
-      const total = attempts.length;
-      const correctas = attempts.filter(a => a.esCorrecta).length;
-      const incorrectas = total - correctas;
-      const porcentaje = total > 0 ? Math.round((correctas / total) * 100) : 0;
+      if (isRecording) return;
+      setIsRecording(true);
 
-      const newSession = await recordSession({
-        courseId: modeParam === 'simulacro' ? undefined : activeCourse.id,
-        courseName: modeParam === 'simulacro' ? 'Simulacro Tipo Admisión' : activeCourse.nombre,
-        topicId: topicParam !== 'all' ? topicParam : undefined,
-        topicName: modeParam === 'simulacro' ? 'Multi-curso (8 Áreas)' : (currentQuestion.topicName || 'Práctica General'),
-        mode: modeParam,
-        duracionSegundos: totalDuration,
-        totalPreguntas: total,
-        correctas,
-        incorrectas,
-        porcentaje,
-        isSimulacro: modeParam === 'simulacro',
-        attempts
-      });
+      try {
+        const totalDuration = Math.round((Date.now() - startTime) / 1000);
+        const total = attempts.length;
+        const correctas = attempts.filter(a => a.esCorrecta).length;
+        const incorrectas = total - correctas;
+        const porcentaje = total > 0 ? Math.round((correctas / total) * 100) : 0;
 
-      navigate(`/results/${newSession.id}`, { replace: true });
+        const newSession = await recordSession({
+          courseId: modeParam === 'simulacro' ? undefined : activeCourse.id,
+          courseName: modeParam === 'simulacro' ? 'Simulacro Tipo Admisión' : activeCourse.nombre,
+          topicId: topicParam !== 'all' ? topicParam : undefined,
+          topicName: modeParam === 'simulacro' ? 'Multi-curso (8 Áreas)' : (currentQuestion.topicName || 'Práctica General'),
+          mode: modeParam,
+          duracionSegundos: totalDuration,
+          totalPreguntas: total,
+          correctas,
+          incorrectas,
+          porcentaje,
+          isSimulacro: modeParam === 'simulacro',
+          attempts
+        });
+
+        navigate(`/results/${newSession.id}`, { replace: true });
+      } catch (err) {
+        console.error('Error recording session:', err);
+        toast.error('Ocurrió un error al guardar tus resultados');
+        setIsRecording(false);
+      }
     } else {
       setCurrentIndex(prev => prev + 1);
     }
@@ -437,11 +456,12 @@ const PracticeQuestionScreen: React.FC = () => {
           {isAnswerLocked ? (
             <button
               onClick={handleNext}
-              className="w-full py-4 px-6 rounded-2xl text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer"
+              disabled={isRecording}
+              className={`w-full py-4 px-6 rounded-2xl text-white font-black text-sm shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer ${isRecording ? 'opacity-70 animate-pulse' : ''}`}
               style={{ backgroundColor: activeCourse.colorHex }}
             >
-              <span>{isLastQuestion ? 'Finalizar y Ver Resultados 🎉' : 'Siguiente pregunta'}</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>{isRecording ? 'Guardando progreso...' : (isLastQuestion ? 'Finalizar y Ver Resultados 🎉' : 'Siguiente pregunta')}</span>
+              {!isRecording && <ArrowRight className="w-4 h-4" />}
             </button>
           ) : (
             <div className="text-center py-2 text-xs font-bold text-slate-400 dark:text-slate-400 flex items-center justify-center gap-1.5">

@@ -106,20 +106,20 @@ const AppContent = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ChuplingoProvider>
-      <TooltipProvider>
-        <Sonner 
-          position="top-center" 
-          visibleToasts={1} 
-          duration={2500} 
-          richColors 
-          closeButton 
-        />
-        <BrowserRouter>
+    <BrowserRouter>
+      <ChuplingoProvider>
+        <TooltipProvider>
+          <Sonner
+            position="top-center"
+            visibleToasts={1}
+            duration={2500}
+            richColors
+            closeButton
+          />
           <AppContent />
-        </BrowserRouter>
-      </TooltipProvider>
-    </ChuplingoProvider>
+        </TooltipProvider>
+      </ChuplingoProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 

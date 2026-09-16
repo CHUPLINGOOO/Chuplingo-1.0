@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { 
+import { useNavigate } from 'react-router-dom';
+import {
   UserProfile, 
   PracticeSession, 
   QuestionAttempt, 
@@ -85,6 +86,7 @@ interface ChuplingoContextType {
     count?: number;
   }) => Promise<{ questions: Question[]; error?: string }>;
   fetchQuestionsFromSupabase: () => Promise<void>;
+  playSoundEffect: (type: 'correct' | 'error' | 'complete' | 'level') => void;
   // Auth Operations
   registerUser: (data: { nombre: string; apellido: string; email: string; password: string }) => Promise<boolean>;
   loginUser: (data: { email: string; password: string }) => Promise<boolean>;
@@ -261,6 +263,7 @@ const ChuplingoContext = createContext<ChuplingoContextType | undefined>(undefin
 
 export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isOnline } = useNetworkStatus();
+  const navigate = useNavigate();
 
   const [user, setUser] = useState<UserProfile>(() => {
     try {
@@ -268,10 +271,17 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (stored) {
         const parsed: UserProfile = JSON.parse(stored);
         const today = getTodayDateString();
+        const yesterday = getYesterdayDateString();
+
         if (parsed.fechaPreguntasHoy !== today) {
           parsed.preguntasRespondidasHoy = 0;
           parsed.fechaPreguntasHoy = today;
           parsed.metaDiariaCumplidaHoy = false;
+        }
+
+        // Reset racha si se perdió un día
+        if (parsed.ultimaFechaRacha && parsed.ultimaFechaRacha !== today && parsed.ultimaFechaRacha !== yesterday) {
+          parsed.rachaActual = 0;
         }
         return parsed;
       }
@@ -287,8 +297,8 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [supabaseErrorMessage, setSupabaseErrorMessage] = useState<string | null>(null);
 
   const [allQuestions, setAllQuestions] = useState<Question[]>([]);
-  // El banco se presenta de forma atractiva y oficial como 8000 preguntas
-  const [totalBankQuestions, setTotalBankQuestions] = useState<number>(8000);
+  // El banco se presenta de forma atractiva y oficial como 8058 preguntas
+  const [totalBankQuestions, setTotalBankQuestions] = useState<number>(8058);
   
   // Conteos por curso preconfigurados en +1000 por cada curso
   const [courseQuestionCounts, setCourseQuestionCounts] = useState<Record<string, number>>({
@@ -431,22 +441,45 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setSupabaseErrorMessage(null);
 
     try {
-      // 1. Cargar TODAS las preguntas activas de Supabase
-      const { data, error } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('active', true)
-        .order('created_at', { ascending: false });
+      let allFetchedQuestions: any[] = [];
+      let from = 0;
+      let to = 999;
+      let hasMore = true;
 
-      if (!error && data && data.length > 0) {
-        const mapped = data.map(mapDbQuestion);
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('questions')
+          .select('*')
+          .eq('active', true)
+          .order('created_at', { ascending: false })
+          .range(from, to);
+
+        if (error) {
+          console.error('[Supabase fetch error]', error);
+          hasMore = false;
+          if (allFetchedQuestions.length === 0) throw error;
+        } else if (data && data.length > 0) {
+          allFetchedQuestions = [...allFetchedQuestions, ...data];
+          if (data.length < 1000) {
+            hasMore = false;
+          } else {
+            from += 1000;
+            to += 1000;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      if (allFetchedQuestions.length > 0) {
+        const mapped = allFetchedQuestions.map(mapDbQuestion);
         setAllQuestions(mapped);
         setSupabaseStatus('connected');
 
         // 2. Conteos reales desde la base de datos
         const realCourseCounts: Record<string, number> = {};
         const realTopicCounts: Record<string, number> = {};
-        data.forEach(q => {
+        allFetchedQuestions.forEach(q => {
           const cid = normalizeCourseId(q.course_id || 'literatura');
           realCourseCounts[cid] = (realCourseCounts[cid] || 0) + 1;
           const tid = q.topic_id || q.subtopic || 'unknown';
@@ -454,7 +487,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
         setCourseQuestionCounts(realCourseCounts);
         setTopicQuestionCounts(realTopicCounts);
-        setTotalBankQuestions(data.length);
+        setTotalBankQuestions(allFetchedQuestions.length);
       } else {
         setSupabaseStatus('connected');
       }
@@ -468,143 +501,137 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Obtener preguntas para una sesión de práctica con clasificación flexible y fallback automático
   const fetchQuestionsForSession = useCallback(async (params: {
-    courseId?: CourseId;
-    topicId?: string;
-    mode: string;
-    difficulty?: string;
-    university?: string;
-    count?: number;
-  }): Promise<{ questions: Question[]; error?: string }> => {
-    const targetCount = params.count || 10;
-
-    try {
-      if (params.mode === 'errores') {
-        const mistakeIds = mistakes.filter(m => !m.dominada).map(m => m.questionId);
-        if (mistakeIds.length === 0) {
-          return { questions: [], error: 'No tienes errores pendientes por repasar.' };
-        }
-
-        const { data, error } = await supabase
-          .from('questions')
-          .select('*')
-          .in('id', mistakeIds)
-          .limit(targetCount);
-
-        if (!error && data && data.length > 0) {
-          return { questions: fastShuffle(data.map(mapDbQuestion)) };
-        }
-
-        // Fallback local en memoria
-        const localMistakes = allQuestions.filter(q => mistakeIds.includes(q.id));
-        if (localMistakes.length > 0) {
-          return { questions: fastShuffle(localMistakes) };
-        }
-        return { questions: [], error: 'No se encontraron las preguntas de tus errores.' };
-      }
-
-      if (params.mode === 'favoritos') {
-        if (favoriteQuestionIds.length === 0) {
-          return { questions: [], error: 'No tienes preguntas guardadas en favoritos.' };
-        }
-
-        const { data, error } = await supabase
-          .from('questions')
-          .select('*')
-          .in('id', favoriteQuestionIds)
-          .limit(targetCount);
-
-        if (!error && data && data.length > 0) {
-          return { questions: fastShuffle(data.map(mapDbQuestion)) };
-        }
-
-        const localFavs = allQuestions.filter(q => favoriteQuestionIds.includes(q.id));
-        if (localFavs.length > 0) {
-          return { questions: fastShuffle(localFavs) };
-        }
-        return { questions: [], error: 'No se encontraron preguntas favoritas.' };
-      }
-
-      // Simulacro General (8 Áreas)
-      if (params.mode === 'simulacro') {
-        const { data, error } = await supabase
-          .from('questions')
-          .select('*')
-          .eq('active', true)
-          .limit(100);
-
-        if (!error && data && data.length > 0) {
-          return { questions: fastShuffle(data.map(mapDbQuestion)).slice(0, targetCount) };
-        }
-
-        if (allQuestions.length > 0) {
-          return { questions: fastShuffle(allQuestions).slice(0, targetCount) };
-        }
-      }
-
-      // 1. Intento por curso y filtros
-      let query = supabase.from('questions').select('*').eq('active', true);
-
-      if (params.courseId) {
-        // Búsqueda flexible por fragmento de nombre de curso
-        const key = params.courseId.replace(/-/g, '%');
-        query = query.or(`course_id.ilike.%${params.courseId}%,course_id.ilike.%${key}%`);
-      }
-
-      if (params.topicId && params.topicId !== 'all') {
-        query = query.or(`topic_id.ilike.%${params.topicId}%,subtopic.ilike.%${params.topicId}%`);
-      }
-
-      if (params.difficulty && params.difficulty !== 'todas') {
-        query = query.ilike('difficulty', `%${params.difficulty}%`);
-      }
-
-      if (params.university && params.university !== 'todas') {
-        query = query.or(`origin.ilike.%${params.university}%,source_document.ilike.%${params.university}%`);
-      }
-
-      const { data, error } = await query.limit(Math.max(40, targetCount * 3));
-
-      if (!error && data && data.length > 0) {
-        return { questions: fastShuffle(data.map(mapDbQuestion)).slice(0, targetCount) };
-      }
-
-      // 2. Fallback a nivel de curso completo si el tema específico tenía 0 filas
-      if (params.courseId) {
-        const { data: courseData } = await supabase
-          .from('questions')
-          .select('*')
-          .ilike('course_id', `%${params.courseId}%`)
-          .eq('active', true)
-          .limit(targetCount * 2);
-
-        if (courseData && courseData.length > 0) {
-          return { questions: fastShuffle(courseData.map(mapDbQuestion)).slice(0, targetCount) };
-        }
-      }
-
-      // 3. Fallback a cualquier pregunta disponible en Supabase o memoria para que el usuario SIEMPRE pueda practicar
-      const { data: globalData } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('active', true)
-        .limit(targetCount * 2);
-
-      if (globalData && globalData.length > 0) {
-        return { questions: fastShuffle(globalData.map(mapDbQuestion)).slice(0, targetCount) };
-      }
-
-      if (allQuestions.length > 0) {
-        return { questions: fastShuffle(allQuestions).slice(0, targetCount) };
-      }
-
-      return { 
-        questions: [], 
-        error: 'No se encontraron preguntas en la base de datos de Supabase.' 
+      courseId?: CourseId;
+      topicId?: string;
+      mode: string;
+      difficulty?: string;
+      university?: string;
+      count?: number;
+    }): Promise<{ questions: Question[]; error?: string }> => {
+      const plan = user.suscripcion?.planId || 'gratis';
+      const planLimits: Record<string, number> = {
+        'gratis': 10,
+        'fan': 25,
+        'lover': 50,
+        'vip': 100
       };
-    } catch (err: any) {
-      return { questions: [], error: `Error de conexión: ${err?.message || 'Fallo de red'}` };
-    }
-  }, [mistakes, favoriteQuestionIds, allQuestions, mapDbQuestion]);
+
+      let targetCount = params.count || 10;
+
+      if (params.mode !== 'simulacro' && params.mode !== 'ilimitado') {
+        const maxForPlan = planLimits[plan] || 10;
+        targetCount = Math.min(targetCount, maxForPlan);
+      } else if (params.mode === 'simulacro') {
+        targetCount = 25;
+      } else if (params.mode === 'ilimitado') {
+        targetCount = planLimits[plan] === 'vip' ? 100 : (planLimits[plan] === 'lover' ? 50 : 25);
+      }
+
+      // Prioridad: Usar el banco local que ya tiene las 8058 preguntas cargadas y normalizadas.
+      // Esto elimina el problema de sesiones incompletas por fallos de red o filtros parciales.
+      let sourcePool = allQuestions.length > 0 ? [...allQuestions] : [];
+
+      // Si el banco local está vacío, intentamos una carga rápida de emergencia
+      if (sourcePool.length === 0) {
+        await fetchQuestionsFromSupabase();
+        sourcePool = [...allQuestions];
+      }
+
+      try {
+        if (params.mode === 'errores') {
+          const mistakeIds = mistakes.filter(m => !m.dominada).map(m => m.questionId);
+          if (mistakeIds.length === 0) return { questions: [], error: 'No tienes errores pendientes.' };
+          const result = sourcePool.filter(q => mistakeIds.includes(q.id));
+          return { questions: fastShuffle(result).slice(0, targetCount) };
+        }
+
+        if (params.mode === 'favoritos') {
+          if (favoriteQuestionIds.length === 0) return { questions: [], error: 'No tienes favoritos.' };
+          const result = sourcePool.filter(q => favoriteQuestionIds.includes(q.id));
+          return { questions: fastShuffle(result).slice(0, targetCount) };
+        }
+
+        if (params.mode === 'simulacro') {
+          // Simulacro toma de todo el banco, mezclado
+          return { questions: fastShuffle(sourcePool).slice(0, targetCount) };
+        }
+
+        // --- BÚSQUEDA ESTRUCTURADA ---
+        let filtered = sourcePool;
+
+        // 1. Filtro por Curso (Obligatorio)
+        if (params.courseId) {
+          filtered = filtered.filter(q => q.courseId === params.courseId);
+        }
+
+        // 2. Filtro por Universidad
+        if (params.university && params.university !== 'todas') {
+          const uni = params.university.toLowerCase();
+          filtered = filtered.filter(q =>
+            (q.fuente || '').toLowerCase().includes(uni) ||
+            (q.origin || '').toLowerCase().includes(uni) ||
+            (q.universityTag || '').toLowerCase().includes(uni)
+          );
+        }
+
+        // 3. Filtro por Dificultad
+        if (params.difficulty && params.difficulty !== 'todas') {
+          filtered = filtered.filter(q => q.dificultad === params.difficulty);
+        }
+
+        let resultQuestions: Question[] = [];
+
+        // 4. Filtro por Tema (Estructura jerárquica)
+        if (params.topicId && params.topicId !== 'all') {
+          // Primero buscamos en el tema exacto
+          const topicQuestions = filtered.filter(q =>
+            q.topicId === params.topicId ||
+            q.subtopic === params.topicId ||
+            (q.topicName && q.topicName.toLowerCase().includes(params.topicId.toLowerCase()))
+          );
+
+          if (topicQuestions.length >= targetCount) {
+            // Si hay suficientes, tomamos esas (mezcladas dentro del tema)
+            resultQuestions = fastShuffle(topicQuestions).slice(0, targetCount);
+          } else {
+            // Si faltan, completamos con el mismo curso para asegurar el conteo
+            const extrasFromCourse = filtered.filter(q => !topicQuestions.find(tq => tq.id === q.id));
+            resultQuestions = [...topicQuestions, ...fastShuffle(extrasFromCourse)].slice(0, targetCount);
+          }
+        } else {
+          // Si es curso general, queremos que sea ESTRUCTURADO por temas
+          // Ordenamos por topicId para que aparezcan agrupadas, pero mezclamos dentro del curso para variedad
+          const shuffledPool = fastShuffle(filtered);
+          resultQuestions = shuffledPool.slice(0, targetCount);
+
+          // Opcional: Re-ordenar por topicId para mantener la estructura académica solicitada
+          resultQuestions.sort((a, b) => (a.topicId || '').localeCompare(b.topicId || ''));
+        }
+
+        // --- GARANTÍA DE CONTEO FINAL ---
+        // Si después de todos los filtros estrictos no llegamos al targetCount, relajamos filtros
+        if (resultQuestions.length < targetCount && params.courseId) {
+          const absoluteCoursePool = sourcePool.filter(q => q.courseId === params.courseId);
+          const alreadyPickedIds = new Set(resultQuestions.map(q => q.id));
+          const missingCount = targetCount - resultQuestions.length;
+
+          const extraFill = fastShuffle(absoluteCoursePool.filter(q => !alreadyPickedIds.has(q.id)));
+          resultQuestions = [...resultQuestions, ...extraFill.slice(0, missingCount)];
+        }
+
+        if (resultQuestions.length > 0) {
+          return { questions: resultQuestions };
+        }
+
+        return {
+          questions: fastShuffle(sourcePool).slice(0, targetCount),
+          error: 'No se encontraron preguntas con esos filtros, iniciamos una práctica general.'
+        };
+
+      } catch (err: any) {
+        return { questions: [], error: `Error de carga: ${err?.message || 'Fallo de datos'}` };
+      }
+    }, [mistakes, favoriteQuestionIds, allQuestions, fetchQuestionsFromSupabase, mapDbQuestion, user.suscripcion]);
 
   const loadUserDataFromSupabase = async (userId: string) => {
     if (!isValidUUID(userId)) return;
@@ -819,33 +846,56 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
   }, [notifications]);
 
-  const playSoundEffect = (type: 'correct' | 'complete' | 'level') => {
+  const playSoundEffect = (type: 'correct' | 'error' | 'complete' | 'level') => {
     if (!user.preferencias.sonido) return;
     try {
-      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
 
       if (type === 'correct') {
-        osc.frequency.setValueAtTime(523.25, ctx.currentTime);
-        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.08);
-        gain.gain.setValueAtTime(0.12, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.22);
+        // "Chirp" de loro: subida rápida de frecuencia
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.1);
+
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+
         osc.start();
-        osc.stop(ctx.currentTime + 0.22);
+        osc.stop(ctx.currentTime + 0.15);
+      } else if (type === 'error') {
+        // "Squawk" corto: sonido más ronco (onda cuadrada) y descendente
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(220, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.15);
+
+        gain.gain.setValueAtTime(0.05, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
       } else if (type === 'complete' || type === 'level') {
-        osc.frequency.setValueAtTime(440, ctx.currentTime);
-        osc.frequency.setValueAtTime(554.37, ctx.currentTime + 0.1);
-        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.2);
-        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.3);
-        gain.gain.setValueAtTime(0.18, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+        // Gorjeo melódico
+        osc.type = 'sine';
+        const now = ctx.currentTime;
+        [880, 1100, 1320, 1760].forEach((freq, i) => {
+          osc.frequency.setValueAtTime(freq, now + (i * 0.1));
+        });
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.1, now + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+
         osc.start();
-        osc.stop(ctx.currentTime + 0.5);
+        osc.stop(now + 0.5);
       }
-    } catch {}
+    } catch (e) {
+      console.error('Audio error', e);
+    }
   };
 
   const registerUser = async (data: { nombre: string; apellido: string; email: string; password: string }): Promise<boolean> => {
@@ -1791,6 +1841,20 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       leido: false
     };
     setNotifications(prev => [newItem, ...prev]);
+
+    // Mostrar notificación visual inmediata (toast)
+    toast(newItem.titulo, {
+      description: newItem.mensaje,
+      action: newItem.actionUrl ? {
+        label: 'Ver',
+        onClick: () => navigate(newItem.actionUrl!)
+      } : undefined
+    });
+
+    // Intentar notificación de sistema si es posible
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(newItem.titulo, { body: newItem.mensaje });
+    }
   };
 
   const getCourseProgress = (courseId: CourseId) => {
@@ -1989,6 +2053,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         userPendingRequest,
         fetchQuestionsForSession,
         fetchQuestionsFromSupabase,
+        playSoundEffect,
         registerUser,
         loginUser,
         verifyUserEmail,

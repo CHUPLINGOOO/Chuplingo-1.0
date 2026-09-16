@@ -52,7 +52,7 @@ export const DailyGoalCard: React.FC = () => {
       <div className="mt-3 flex items-center justify-between pt-1">
         <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 font-semibold">
           <Flame className="w-4 h-4 text-[#FF5722]" />
-          <span>Racha: <strong className="text-[#183153] dark:text-white">{user.rachaActual} días</strong></span>
+          <span>Racha: <strong className="text-[#183153] dark:text-white">{user.rachaActual} {user.rachaActual === 1 ? 'día' : 'días'}</strong></span>
         </div>
 
         {!isCompleted ? (

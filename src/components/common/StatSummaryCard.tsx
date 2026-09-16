@@ -9,7 +9,7 @@ export const StatSummaryCard: React.FC = () => {
   const stats = [
     {
       label: 'Racha',
-      value: `${user.rachaActual} días`,
+      value: `${user.rachaActual} ${user.rachaActual === 1 ? 'día' : 'días'}`,
       icon: Flame,
       color: 'text-[#FF5722]',
       bg: 'bg-orange-50 dark:bg-orange-950/60'

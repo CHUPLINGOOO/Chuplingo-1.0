@@ -4,7 +4,7 @@ import { COURSES } from '../data/coursesData';
 import { AppHeader } from '../components/layout/AppHeader';
 import { useChuplingo } from '../context/ChuplingoContext';
 import { PracticeMode, CourseId, UniversityTarget } from '../types/chuplingo';
-import { Zap, Target, Flame, AlertCircle, Star, Timer, Building2, Check, ArrowRight } from 'lucide-react';
+import { Zap, Target, Flame, AlertCircle, Star, Timer, Building2, Check, ArrowRight, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PracticeSetup: React.FC = () => {
@@ -84,16 +84,25 @@ const PracticeSetup: React.FC = () => {
       disabled: activeMistakesCount === 0
     },
     {
-      id: 'favoritos' as PracticeMode,
-      title: 'Preguntas guardadas',
-      count: favoritesCount,
-      description: `Practica tu colección personal (${favoritesCount} guardadas).`,
-      icon: Star,
-      badge: `${favoritesCount} guardadas`,
-      color: '#F5A623',
-      disabled: favoritesCount === 0
-    }
-  ];
+          id: 'favoritos' as PracticeMode,
+          title: 'Preguntas guardadas',
+          count: favoritesCount,
+          description: `Practica tu colección personal (${favoritesCount} guardadas).`,
+          icon: Star,
+          badge: `${favoritesCount} guardadas`,
+          color: '#F5A623',
+          disabled: favoritesCount === 0
+        },
+        {
+          id: 'ilimitado' as PracticeMode,
+          title: 'Práctica Ilimitada',
+          count: 10000,
+          description: 'Practica TODAS las preguntas disponibles del curso seleccionado',
+          icon: RefreshCw,
+          badge: '∞ preguntas',
+          color: '#10B981'
+        }
+      ];
 
   const handleStart = () => {
     const query = new URLSearchParams({
