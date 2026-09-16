@@ -431,36 +431,33 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setSupabaseErrorMessage(null);
 
     try {
-      // 1. Cargar preguntas activas de Supabase
+      // 1. Cargar TODAS las preguntas activas de Supabase
       const { data, error } = await supabase
         .from('questions')
         .select('*')
         .eq('active', true)
-        .order('created_at', { ascending: false })
-        .limit(1000);
+        .order('created_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
         const mapped = data.map(mapDbQuestion);
         setAllQuestions(mapped);
         setSupabaseStatus('connected');
+
+        // 2. Conteos reales desde la base de datos
+        const realCourseCounts: Record<string, number> = {};
+        const realTopicCounts: Record<string, number> = {};
+        data.forEach(q => {
+          const cid = normalizeCourseId(q.course_id || 'literatura');
+          realCourseCounts[cid] = (realCourseCounts[cid] || 0) + 1;
+          const tid = q.topic_id || q.subtopic || 'unknown';
+          realTopicCounts[tid] = (realTopicCounts[tid] || 0) + 1;
+        });
+        setCourseQuestionCounts(realCourseCounts);
+        setTopicQuestionCounts(realTopicCounts);
+        setTotalBankQuestions(data.length);
       } else {
         setSupabaseStatus('connected');
       }
-
-      // 2. Establecer 1000 preguntas por curso y 100 por tema para la presentación oficial
-      const defaultCourseCounts: Record<string, number> = {};
-      const defaultTopicCounts: Record<string, number> = {};
-
-      COURSES.forEach(c => {
-        defaultCourseCounts[c.id] = 1000;
-        c.temas.forEach(t => {
-          defaultTopicCounts[t.id] = 100;
-        });
-      });
-
-      setCourseQuestionCounts(defaultCourseCounts);
-      setTopicQuestionCounts(defaultTopicCounts);
-      setTotalBankQuestions(8000);
     } catch (err: any) {
       console.error('[Supabase connection note]', err);
       setSupabaseStatus('connected');
