@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, BookOpen, Trophy, BarChart3, User } from 'lucide-react';
 import { useChuplingo } from '../../context/ChuplingoContext';
+import { motion } from 'framer-motion';
 
 export const BottomNav: React.FC = () => {
   const navigate = useNavigate();
@@ -28,8 +29,9 @@ export const BottomNav: React.FC = () => {
           const IconComponent = item.icon;
 
           return (
-            <button
+            <motion.button
               key={item.label}
+              whileTap={{ scale: 0.9 }}
               onClick={() => navigate(item.path)}
               className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all duration-200 relative ${
                 isActive ? 'scale-105' : 'opacity-65 hover:opacity-100'
@@ -55,7 +57,7 @@ export const BottomNav: React.FC = () => {
               {item.label === 'Desafíos' && claimedChallengeIds.length === 0 && (
                 <span className="absolute top-1.5 right-3 w-2 h-2 bg-[#FF9418] rounded-full animate-pulse ring-2 ring-white dark:ring-slate-900" />
               )}
-            </button>
+            </motion.button>
           );
         })}
       </div>

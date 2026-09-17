@@ -850,48 +850,51 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!user.preferencias.sonido) return;
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+
+      const playChirp = (freq: number, duration: number, delay: number = 0) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.5, ctx.currentTime + delay + duration);
+
+        gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+        gain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + delay + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + delay + duration);
+
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + duration);
+      };
 
       if (type === 'correct') {
-        // "Chirp" de loro: subida rápida de frecuencia
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.1);
+        // Doble chirp alegre
+        playChirp(880, 0.1);
+        playChirp(1320, 0.08, 0.05);
+      } else if (type === 'error') {
+        // Squawk más orgánico (ronco)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
 
-        gain.gain.setValueAtTime(0, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.1);
+
+        gain.gain.setValueAtTime(0.03, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
 
         osc.start();
         osc.stop(ctx.currentTime + 0.15);
-      } else if (type === 'error') {
-        // "Squawk" corto: sonido más ronco (onda cuadrada) y descendente
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(220, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.15);
-
-        gain.gain.setValueAtTime(0.05, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-
-        osc.start();
-        osc.stop(ctx.currentTime + 0.2);
       } else if (type === 'complete' || type === 'level') {
-        // Gorjeo melódico
-        osc.type = 'sine';
-        const now = ctx.currentTime;
-        [880, 1100, 1320, 1760].forEach((freq, i) => {
-          osc.frequency.setValueAtTime(freq, now + (i * 0.1));
+        // Melodía de pajaritos (gorjeo)
+        const notes = [880, 1100, 1320, 1760, 1500];
+        notes.forEach((freq, i) => {
+          playChirp(freq, 0.15, i * 0.08);
         });
-
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.1, now + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-
-        osc.start();
-        osc.stop(now + 0.5);
       }
     } catch (e) {
       console.error('Audio error', e);
@@ -1463,17 +1466,25 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (newStreak > newBestStreak) {
         newBestStreak = newStreak;
       }
-      toast.success(`🎯 ¡Meta diaria completada! (+50 XP)`, {
-        description: `Racha activa: 🔥 ${newStreak} días seguidos.`
+
+      addNotification({
+        titulo: '🎯 ¡Meta diaria completada!',
+        mensaje: `Has alcanzado tu objetivo de hoy. Racha actual: 🔥 ${newStreak} días.`,
+        tipo: 'racha'
       });
+
       triggerConfetti();
     }
 
     if (newLevel > user.nivel) {
       playSoundEffect('level');
-      toast.success(`🎉 ¡Subiste de Nivel! Ahora eres Nivel ${newLevel} (${newTitle})`, {
-        duration: 5000
+
+      addNotification({
+        titulo: '🎉 ¡Subiste de Nivel!',
+        mensaje: `¡Increíble! Ahora eres Nivel ${newLevel} (${newTitle}).`,
+        tipo: 'logro'
       });
+
       triggerConfetti();
     } else {
       playSoundEffect('complete');
@@ -1683,7 +1694,12 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     playSoundEffect('complete');
     triggerConfetti();
-    toast.success(`🎉 ¡Recompensa reclamada! +${challenge.recompensaXP} XP`);
+
+    addNotification({
+      titulo: '🏆 ¡Recompensa reclamada!',
+      mensaje: `Has ganado +${challenge.recompensaXP} XP por completar "${challenge.titulo}".`,
+      tipo: 'desafio'
+    });
   };
 
   const completeOnboarding = (prefs?: { metaDiaria?: number; horarioEstudio?: string; cursosFavoritos?: CourseId[] }) => {

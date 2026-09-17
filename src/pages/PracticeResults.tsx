@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChuplingo } from '../context/ChuplingoContext';
 import { COURSES } from '../data/coursesData';
 import { ChuplingoMascot } from '../components/mascot/ChuplingoMascot';
-import { 
+import { triggerConfetti } from '../utils/confetti';
+import { motion } from 'framer-motion';
+import {
   CheckCircle2, 
   XCircle, 
   Clock, 
@@ -21,6 +23,14 @@ const PracticeResults: React.FC = () => {
   const { sessions, user } = useChuplingo();
 
   const session = sessions.find((s) => s.id === sessionId) || sessions[0];
+
+  useEffect(() => {
+    if (session && session.porcentaje >= 70) {
+      triggerConfetti();
+      const timer = setTimeout(() => triggerConfetti(), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [session]);
 
   if (!session) {
     return (
@@ -43,10 +53,17 @@ const PracticeResults: React.FC = () => {
   const timeFormatted = `${minutes}:${String(seconds).padStart(2, '0')}`;
 
   return (
-    <div className="min-h-screen bg-[#F7F8FC] dark:bg-slate-900 flex flex-col justify-between pb-8 transition-colors">
+    <div className="min-h-screen bg-[#F7F8FC] dark:bg-slate-900 flex flex-col justify-between pb-10 transition-colors overflow-x-hidden">
       {/* Top Banner */}
       <div className="bg-gradient-to-b from-[#183153] to-[#254A7A] text-white pt-8 pb-12 px-6 rounded-b-[36px] text-center relative overflow-hidden">
-        <div className="relative z-10 flex flex-col items-center">
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,rgba(240,92,84,0.15),transparent)] pointer-events-none" />
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.5, type: "spring" }}
+          className="relative z-10 flex flex-col items-center"
+        >
           <ChuplingoMascot mood={isPassed ? 'celebrating' : 'thinking'} size="lg" />
 
           <h1 className="text-2xl font-black mt-3">
@@ -57,20 +74,30 @@ const PracticeResults: React.FC = () => {
           </p>
 
           {/* Big Circular Percentage */}
-          <div className="mt-5 w-28 h-28 rounded-full bg-white/10 backdrop-blur-md border-4 border-white/20 flex flex-col items-center justify-center shadow-inner">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
+            className="mt-5 w-28 h-28 rounded-full bg-white/10 backdrop-blur-md border-4 border-white/20 flex flex-col items-center justify-center shadow-inner"
+          >
             <span className="text-3xl font-black text-white">
               {session.porcentaje}%
             </span>
             <span className="text-[10px] uppercase font-bold tracking-wider text-amber-300">
               Precisión
             </span>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </div>
 
       {/* Stats Breakdown Card */}
       <div className="px-4 -mt-6 relative z-20">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-md border border-slate-100 dark:border-slate-700 grid grid-cols-3 gap-2 text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-md border border-slate-100 dark:border-slate-700 grid grid-cols-3 gap-2 text-center"
+        >
           <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 mx-auto mb-1" />
             <span className="text-lg font-black text-emerald-700 dark:text-emerald-300 block leading-none">
@@ -100,10 +127,15 @@ const PracticeResults: React.FC = () => {
               XP ganado
             </span>
           </div>
-        </div>
+        </motion.div>
 
         {/* Time and Total Info */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-3.5 shadow-sm border border-slate-100 dark:border-slate-700 mt-3 flex items-center justify-between text-xs">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="bg-white dark:bg-slate-800 rounded-2xl p-3.5 shadow-sm border border-slate-100 dark:border-slate-700 mt-3 flex items-center justify-between text-xs"
+        >
           <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-semibold">
             <Clock className="w-4 h-4 text-slate-400" />
             <span>Tiempo empleado: <strong className="text-[#183153] dark:text-white">{timeFormatted}</strong></span>
@@ -113,11 +145,16 @@ const PracticeResults: React.FC = () => {
             <Award className="w-4 h-4 text-purple-500" />
             <span>Nivel actual: <strong className="text-[#183153] dark:text-white">{user.nivel}</strong></span>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Action Buttons */}
-      <div className="px-4 flex flex-col gap-2.5 mt-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="px-4 flex flex-col gap-2.5 mt-6"
+      >
         {session.incorrectas > 0 && (
           <button
             onClick={() => navigate('/mistakes')}
@@ -152,7 +189,7 @@ const PracticeResults: React.FC = () => {
           <Home className="w-4 h-4" />
           <span>Ir al Inicio</span>
         </button>
-      </div>
+      </motion.div>
     </div>
   );
 };

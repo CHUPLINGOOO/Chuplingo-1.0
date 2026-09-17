@@ -11,7 +11,7 @@ export const DailyGoalCard: React.FC = () => {
   const isCompleted = user.metaDiariaCumplidaHoy || user.preguntasRespondidasHoy >= user.preferencias.metaDiaria;
 
   return (
-    <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/80 mx-4 transition-colors">
+    <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/80 mx-4 transition-all hover:shadow-md">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-[#FF9418] flex items-center justify-center">

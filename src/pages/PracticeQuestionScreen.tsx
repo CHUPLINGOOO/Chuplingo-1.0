@@ -4,7 +4,8 @@ import { COURSES } from '../data/coursesData';
 import { Question, QuestionAttempt, CourseId, PracticeMode } from '../types/chuplingo';
 import { useChuplingo } from '../context/ChuplingoContext';
 import { ExitPracticeDialog } from '../components/practice/ExitPracticeDialog';
-import { 
+import { motion, AnimatePresence } from 'framer-motion';
+import {
   Star, 
   ArrowRight, 
   CheckCircle2, 
@@ -348,106 +349,120 @@ const PracticeQuestionScreen: React.FC = () => {
       </div>
 
       {/* Main Question Container */}
-      <div className="p-4 flex-1 flex flex-col gap-3.5 max-w-[430px] mx-auto w-full">
-        {/* Metadata Chips: Universidad y Tema */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-black px-3 py-1 rounded-xl bg-[#183153] dark:bg-slate-800 text-white shadow-xs border border-slate-700/50">
-            <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
-            <span>{currentQuestion.fuente || 'UNMSM 2024-I'}</span>
-          </span>
-
-          <span 
-            className="text-[10px] font-black px-2.5 py-1 rounded-xl text-white shadow-2xs"
-            style={{ backgroundColor: activeCourse.colorHex }}
+      <div className="p-4 flex-1 flex flex-col gap-3.5 max-w-[430px] mx-auto w-full overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentIndex}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="flex flex-col gap-3.5 w-full"
           >
-            {currentQuestion.topicName || activeCourse.nombre}
-          </span>
+            {/* Metadata Chips: Universidad y Tema */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-black px-3 py-1 rounded-xl bg-[#183153] dark:bg-slate-800 text-white shadow-xs border border-slate-700/50">
+                <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
+                <span>{currentQuestion.fuente || 'UNMSM 2024-I'}</span>
+              </span>
 
-          <span className="text-[10px] font-black px-2 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 capitalize border border-slate-200 dark:border-slate-700">
-            Nivel {currentQuestion.dificultad}
-          </span>
-        </div>
-
-        {/* Question Enunciation Card */}
-        <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-700/80 transition-all">
-          <h2 className="text-sm sm:text-base font-black text-[#183153] dark:text-white leading-relaxed">
-            {currentQuestion.pregunta}
-          </h2>
-        </div>
-
-        {/* Alternatives (A, B, C, D, E) */}
-        <div className="flex flex-col gap-2.5">
-          {currentQuestion.alternativas.map((alt) => {
-            const isSelected = selectedAnswer === alt.id;
-            const isCorrect = alt.id === currentQuestion.respuestaCorrecta;
-
-            let optionStyle = 'bg-white dark:bg-[#1E293B] border-slate-200/90 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-200 shadow-2xs';
-            let badgeStyle = 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
-
-            if (isAnswerLocked) {
-              if (isCorrect) {
-                optionStyle = 'bg-emerald-50/90 dark:bg-emerald-950/70 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-200 font-black shadow-sm';
-                badgeStyle = 'bg-emerald-500 text-white font-black';
-              } else if (isSelected && !isCorrect) {
-                optionStyle = 'bg-rose-50/90 dark:bg-rose-950/70 border-2 border-rose-500 text-rose-950 dark:text-rose-200 font-black shadow-sm';
-                badgeStyle = 'bg-rose-500 text-white font-black';
-              } else {
-                optionStyle = 'bg-slate-50/60 dark:bg-slate-900/60 border-slate-100 dark:border-slate-800 text-slate-400 opacity-55';
-              }
-            } else if (isSelected) {
-              optionStyle = 'bg-white dark:bg-[#1E293B] border-2 shadow-md';
-              badgeStyle = 'bg-[#183153] dark:bg-purple-600 text-white';
-            }
-
-            return (
-              <button
-                key={alt.id}
-                disabled={isAnswerLocked}
-                onClick={() => handleSelectOption(alt.id)}
-                className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all active:scale-[0.99] cursor-pointer ${optionStyle}`}
+              <span
+                className="text-[10px] font-black px-2.5 py-1 rounded-xl text-white shadow-2xs"
+                style={{ backgroundColor: activeCourse.colorHex }}
               >
-                <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 transition-colors shadow-2xs ${badgeStyle}`}>
-                  {alt.id}
-                </span>
-                <span className="text-xs sm:text-sm pt-0.5 leading-snug flex-1 font-semibold">
-                  {alt.text}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                {currentQuestion.topicName || activeCourse.nombre}
+              </span>
 
-        {/* Pedagogical Feedback */}
-        {isAnswerLocked && (
-          <div className={`p-4 rounded-3xl border animate-in fade-in slide-in-from-bottom-2 duration-200 shadow-xs ${
-            selectedAnswer === currentQuestion.respuestaCorrecta
-              ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200'
-              : 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200'
-          }`}>
-            <div className="flex items-center gap-2 mb-1 font-black text-sm">
-              {selectedAnswer === currentQuestion.respuestaCorrecta ? (
-                <>
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                  <span>¡Excelente! Respuesta correcta (+10 XP)</span>
-                </>
-              ) : (
-                <>
-                  <XCircle className="w-5 h-5 text-rose-600" />
-                  <span>Respuesta incorrecta</span>
-                </>
-              )}
+              <span className="text-[10px] font-black px-2 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 capitalize border border-slate-200 dark:border-slate-700">
+                Nivel {currentQuestion.dificultad}
+              </span>
             </div>
 
-            {currentQuestion.explicacion && (
-              <div className="mt-2 text-xs leading-relaxed text-slate-700 dark:text-slate-200 bg-white/80 dark:bg-slate-900/80 p-3 rounded-2xl border border-white/60 dark:border-slate-800">
-                <strong className="block text-[#183153] dark:text-white mb-1 flex items-center gap-1 font-black">
-                  <Lightbulb className="w-3.5 h-3.5 text-amber-500" /> Fundamentación académica:
-                </strong>
-                {currentQuestion.explicacion}
-              </div>
+            {/* Question Enunciation Card */}
+            <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-700/80 transition-all">
+              <h2 className="text-sm sm:text-base font-black text-[#183153] dark:text-white leading-relaxed">
+                {currentQuestion.pregunta}
+              </h2>
+            </div>
+
+            {/* Alternatives (A, B, C, D, E) */}
+            <div className="flex flex-col gap-2.5">
+              {currentQuestion.alternativas.map((alt) => {
+                const isSelected = selectedAnswer === alt.id;
+                const isCorrect = alt.id === currentQuestion.respuestaCorrecta;
+
+                let optionStyle = 'bg-white dark:bg-[#1E293B] border-slate-200/90 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-200 shadow-2xs';
+                let badgeStyle = 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
+
+                if (isAnswerLocked) {
+                  if (isCorrect) {
+                    optionStyle = 'bg-emerald-50/90 dark:bg-emerald-950/70 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-200 font-black shadow-sm';
+                    badgeStyle = 'bg-emerald-500 text-white font-black';
+                  } else if (isSelected && !isCorrect) {
+                    optionStyle = 'bg-rose-50/90 dark:bg-rose-950/70 border-2 border-rose-500 text-rose-950 dark:text-rose-200 font-black shadow-sm';
+                    badgeStyle = 'bg-rose-500 text-white font-black';
+                  } else {
+                    optionStyle = 'bg-slate-50/60 dark:bg-slate-900/60 border-slate-100 dark:border-slate-800 text-slate-400 opacity-55';
+                  }
+                } else if (isSelected) {
+                  optionStyle = 'bg-white dark:bg-[#1E293B] border-2 shadow-md';
+                  badgeStyle = 'bg-[#183153] dark:bg-purple-600 text-white';
+                }
+
+                return (
+                  <button
+                    key={alt.id}
+                    disabled={isAnswerLocked}
+                    onClick={() => handleSelectOption(alt.id)}
+                    className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all active:scale-[0.99] cursor-pointer ${optionStyle}`}
+                  >
+                    <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 transition-colors shadow-2xs ${badgeStyle}`}>
+                      {alt.id}
+                    </span>
+                    <span className="text-xs sm:text-sm pt-0.5 leading-snug flex-1 font-semibold">
+                      {alt.text}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Pedagogical Feedback */}
+            {isAnswerLocked && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`p-4 rounded-3xl border shadow-xs ${
+                selectedAnswer === currentQuestion.respuestaCorrecta
+                  ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200'
+                  : 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200'
+              }`}>
+                <div className="flex items-center gap-2 mb-1 font-black text-sm">
+                  {selectedAnswer === currentQuestion.respuestaCorrecta ? (
+                    <>
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      <span>¡Excelente! Respuesta correcta (+10 XP)</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-5 h-5 text-rose-600" />
+                      <span>Respuesta incorrecta</span>
+                    </>
+                  )}
+                </div>
+
+                {currentQuestion.explicacion && (
+                  <div className="mt-2 text-xs leading-relaxed text-slate-700 dark:text-slate-200 bg-white/80 dark:bg-slate-900/80 p-3 rounded-2xl border border-white/60 dark:border-slate-800">
+                    <strong className="block text-[#183153] dark:text-white mb-1 flex items-center gap-1 font-black">
+                      <Lightbulb className="w-3.5 h-3.5 text-amber-500" /> Fundamentación académica:
+                    </strong>
+                    {currentQuestion.explicacion}
+                  </div>
+                )}
+              </motion.div>
             )}
-          </div>
-        )}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Bottom Floating Bar */}

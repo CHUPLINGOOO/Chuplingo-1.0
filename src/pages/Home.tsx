@@ -8,7 +8,8 @@ import { DailyGoalCard } from '../components/common/DailyGoalCard';
 import { CourseCard } from '../components/common/CourseCard';
 import { ChallengeCard } from '../components/common/ChallengeCard';
 import { ChuplingoMascot } from '../components/mascot/ChuplingoMascot';
-import { 
+import { motion } from 'framer-motion';
+import {
   Play, 
   ArrowRight, 
   Sparkles, 
@@ -41,10 +42,30 @@ const Home: React.FC = () => {
   const unreadNotifs = notifications.filter(n => !n.leido).length;
   const missingQuestionsToday = Math.max(0, user.preferencias.metaDiaria - user.preguntasRespondidasHoy);
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0 }
+  };
+
   return (
-    <div className="flex flex-col gap-4">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="flex flex-col gap-4 pb-20"
+    >
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-[#F05C54] via-[#FF7B54] to-[#FF9418] text-white px-5 pt-7 pb-8 rounded-b-[36px] shadow-md relative overflow-hidden">
+      <motion.div variants={itemVariants} className="bg-gradient-to-r from-[#F05C54] via-[#FF7B54] to-[#FF9418] text-white px-5 pt-7 pb-8 rounded-b-[36px] shadow-md relative overflow-hidden">
         <div className="absolute right-0 -top-4 w-36 h-36 bg-white/10 rounded-full blur-xl pointer-events-none" />
         <div className="absolute left-10 -bottom-8 w-28 h-28 bg-amber-300/15 rounded-full blur-lg pointer-events-none" />
         
@@ -92,16 +113,20 @@ const Home: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Floating Stat Summary */}
-      <StatSummaryCard />
+      <motion.div variants={itemVariants}>
+        <StatSummaryCard />
+      </motion.div>
 
       {/* Daily Goal Card */}
-      <DailyGoalCard />
+      <motion.div variants={itemVariants}>
+        <DailyGoalCard />
+      </motion.div>
 
       {/* Selector Rápido de Banco de Preguntas por Universidad */}
-      <div className="px-4">
+      <motion.div variants={itemVariants} className="px-4">
         <div className="bg-white dark:bg-[#1E293B] rounded-3xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/80 transition-colors">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-black text-[#183153] dark:text-white uppercase tracking-wide flex items-center gap-1.5">
@@ -128,10 +153,10 @@ const Home: React.FC = () => {
             ))}
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Quick Simulacro Action Card */}
-      <div className="px-4">
+      <motion.div variants={itemVariants} className="px-4">
         <div className="bg-gradient-to-r from-[#7354D9] via-[#8363E8] to-[#9176EA] text-white rounded-3xl p-4 shadow-sm flex items-center justify-between gap-3 relative overflow-hidden">
           <div className="absolute right-0 top-0 w-24 h-24 bg-white/10 rounded-full blur-lg pointer-events-none" />
           
@@ -152,10 +177,10 @@ const Home: React.FC = () => {
             <span>Iniciar</span>
           </button>
         </div>
-      </div>
+      </motion.div>
 
       {/* Quick Continue / Recommendation Card */}
-      <div className="px-4">
+      <motion.div variants={itemVariants} className="px-4">
         <div className="bg-gradient-to-br from-[#163A63] via-[#1C4677] to-[#1F4E85] text-white rounded-3xl p-4 shadow-sm relative overflow-hidden">
           <div className="flex items-start justify-between gap-3 relative z-10">
             <div className="flex-1 min-w-0">
@@ -223,10 +248,10 @@ const Home: React.FC = () => {
             </button>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Mis Cursos Header & Preview */}
-      <div className="px-4 flex flex-col gap-3">
+      <motion.div variants={itemVariants} className="px-4 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-[#F05C54]" />
@@ -248,10 +273,10 @@ const Home: React.FC = () => {
             <CourseCard key={course.id} course={course} />
           ))}
         </div>
-      </div>
+      </motion.div>
 
       {/* Desafíos de Hoy Preview */}
-      <div className="px-4 flex flex-col gap-3 mb-3">
+      <motion.div variants={itemVariants} className="px-4 flex flex-col gap-3 mb-3">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-black text-[#183153] dark:text-white flex items-center gap-2">
             <span>🏆</span> Desafíos de Hoy
@@ -270,8 +295,8 @@ const Home: React.FC = () => {
             <ChallengeCard key={ch.id} challenge={ch} />
           ))}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 

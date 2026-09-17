@@ -8,6 +8,7 @@ import { MobileContainer } from "./components/layout/MobileContainer";
 import { BottomNav } from "./components/layout/BottomNav";
 import { NetworkStatusBanner } from "./components/common/NetworkStatusBanner";
 import { SplashScreen } from "./components/common/SplashScreen";
+import { AnimatePresence, motion } from "framer-motion";
 
 // Core Pages
 import Home from "./pages/Home";
@@ -39,6 +40,22 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+const PageWrapper = ({ children }: { children: React.ReactNode }) => {
+  const location = useLocation();
+  return (
+    <motion.div
+      key={location.pathname}
+      initial={{ opacity: 0, x: 15 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -15 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="w-full h-full flex flex-col"
+    >
+      {children}
+    </motion.div>
+  );
+};
+
 const AppContent = () => {
   const location = useLocation();
   const { isLoadingQuestions } = useChuplingo();
@@ -69,35 +86,37 @@ const AppContent = () => {
       )}
       <MobileContainer hasBottomNav={!shouldHideBottomNav}>
         <NetworkStatusBanner />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/welcome" element={<Welcome />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/courses" element={<CoursesList />} />
-          <Route path="/courses/:courseId" element={<CourseDetail />} />
-          <Route path="/practice-setup" element={<PracticeSetup />} />
-          <Route path="/practice-setup/:courseId" element={<PracticeSetup />} />
-          <Route path="/practice-setup/:courseId/:topicId" element={<PracticeSetup />} />
-          <Route path="/practice" element={<PracticeQuestionScreen />} />
-          <Route path="/results/:sessionId" element={<PracticeResults />} />
-          <Route path="/challenges" element={<ChallengesScreen />} />
-          <Route path="/progress" element={<ProgressScreen />} />
-          <Route path="/history" element={<PracticeHistory />} />
-          <Route path="/mistakes" element={<MistakesScreen />} />
-          <Route path="/favorites" element={<FavoritesScreen />} />
-          <Route path="/achievements" element={<AchievementsScreen />} />
-          <Route path="/plans" element={<PlansScreen />} />
-          <Route path="/notifications" element={<NotificationsCenter />} />
-          <Route path="/email-templates" element={<EmailTemplatesPreview />} />
-          <Route path="/admin" element={<AdminScreen />} />
-          <Route path="/descargar" element={<DownloadApp />} />
-          <Route path="/download" element={<DownloadApp />} />
-          <Route path="/profile" element={<ProfileScreen />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
+            <Route path="/welcome" element={<PageWrapper><Welcome /></PageWrapper>} />
+            <Route path="/register" element={<PageWrapper><Register /></PageWrapper>} />
+            <Route path="/login" element={<PageWrapper><Login /></PageWrapper>} />
+            <Route path="/verify-email" element={<PageWrapper><VerifyEmail /></PageWrapper>} />
+            <Route path="/forgot-password" element={<PageWrapper><ForgotPassword /></PageWrapper>} />
+            <Route path="/courses" element={<PageWrapper><CoursesList /></PageWrapper>} />
+            <Route path="/courses/:courseId" element={<PageWrapper><CourseDetail /></PageWrapper>} />
+            <Route path="/practice-setup" element={<PageWrapper><PracticeSetup /></PageWrapper>} />
+            <Route path="/practice-setup/:courseId" element={<PageWrapper><PracticeSetup /></PageWrapper>} />
+            <Route path="/practice-setup/:courseId/:topicId" element={<PageWrapper><PracticeSetup /></PageWrapper>} />
+            <Route path="/practice" element={<PracticeQuestionScreen />} />
+            <Route path="/results/:sessionId" element={<PageWrapper><PracticeResults /></PageWrapper>} />
+            <Route path="/challenges" element={<PageWrapper><ChallengesScreen /></PageWrapper>} />
+            <Route path="/progress" element={<PageWrapper><ProgressScreen /></PageWrapper>} />
+            <Route path="/history" element={<PageWrapper><PracticeHistory /></PageWrapper>} />
+            <Route path="/mistakes" element={<PageWrapper><MistakesScreen /></PageWrapper>} />
+            <Route path="/favorites" element={<PageWrapper><FavoritesScreen /></PageWrapper>} />
+            <Route path="/achievements" element={<PageWrapper><AchievementsScreen /></PageWrapper>} />
+            <Route path="/plans" element={<PageWrapper><PlansScreen /></PageWrapper>} />
+            <Route path="/notifications" element={<PageWrapper><NotificationsCenter /></PageWrapper>} />
+            <Route path="/email-templates" element={<PageWrapper><EmailTemplatesPreview /></PageWrapper>} />
+            <Route path="/admin" element={<PageWrapper><AdminScreen /></PageWrapper>} />
+            <Route path="/descargar" element={<PageWrapper><DownloadApp /></PageWrapper>} />
+            <Route path="/download" element={<PageWrapper><DownloadApp /></PageWrapper>} />
+            <Route path="/profile" element={<PageWrapper><ProfileScreen /></PageWrapper>} />
+            <Route path="*" element={<PageWrapper><NotFound /></PageWrapper>} />
+          </Routes>
+        </AnimatePresence>
         {!shouldHideBottomNav && <BottomNav />}
       </MobileContainer>
     </>
