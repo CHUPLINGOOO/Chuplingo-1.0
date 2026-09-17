@@ -791,6 +791,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   useEffect(() => {
+    // 1. Carga inicial de preguntas
     fetchQuestionsFromSupabase();
 
     const checkInitialSession = async () => {
@@ -798,19 +799,7 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           setIsAuthenticated(true);
-          const meta = session.user.user_metadata || {};
-
-          setUser(prev => ({
-            ...prev,
-            id: session.user.id,
-            email: session.user.email || prev.email,
-            emailVerificado: !!session.user.email_confirmed_at,
-            nombre: meta.first_name || meta.nombre || prev.nombre || 'Estudiante',
-            apellido: meta.last_name || meta.apellido || prev.apellido || 'Chuplingo',
-            onboardingCompletado: true
-          }));
-
-          loadUserDataFromSupabase(session.user.id);
+          await loadUserDataFromSupabase(session.user.id);
         }
       } catch (err) {
         console.error('[Supabase auth session error]', err);
@@ -819,26 +808,18 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     checkInitialSession();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    // 2. Escuchar cambios de estado de autenticación (Login/Logout/etc)
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth Event:", event);
+
       if (session?.user) {
         setIsAuthenticated(true);
-        const meta = session.user.user_metadata || {};
-
-        setUser(prev => ({
-          ...prev,
-          id: session.user.id,
-          email: session.user.email || prev.email,
-          emailVerificado: !!session.user.email_confirmed_at,
-          nombre: meta.first_name || meta.nombre || prev.nombre || 'Estudiante',
-          apellido: meta.last_name || meta.apellido || prev.apellido || 'Chuplingo',
-          onboardingCompletado: true
-        }));
-
-        loadUserDataFromSupabase(session.user.id);
+        await loadUserDataFromSupabase(session.user.id);
       } else if (event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
         setUser(INITIAL_USER);
         setUserPendingRequest(null);
+        localStorage.removeItem(STORAGE_KEYS.USER_STATS); // Limpiar para evitar basura
       }
     });
 
@@ -988,6 +969,10 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const loginUser = async (data: { email: string; password: string }): Promise<boolean> => {
     const emailNorm = data.email.trim().toLowerCase();
     try {
+      // 1. Intentar cerrar sesión previa por seguridad
+      await supabase.auth.signOut();
+
+      // 2. Iniciar sesión real
       const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: emailNorm,
         password: data.password
@@ -998,22 +983,18 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return false;
       }
 
-      const meta = authData.user?.user_metadata || {};
+      if (authData.user) {
+        setIsAuthenticated(true);
 
-      setUser(prev => ({
-        ...prev,
-        id: authData.user.id,
-        email: authData.user.email || emailNorm,
-        emailVerificado: !!authData.user.email_confirmed_at,
-        nombre: meta.first_name || meta.nombre || prev.nombre || 'Estudiante',
-        apellido: meta.last_name || meta.apellido || prev.apellido || 'Chuplingo',
-        onboardingCompletado: true
-      }));
+        // 3. Forzar carga de datos del perfil
+        await loadUserDataFromSupabase(authData.user.id);
 
-      setIsAuthenticated(true);
-      toast.success(`¡Bienvenido de nuevo, ${meta.first_name || 'Estudiante'}!`);
-      return true;
-    } catch {
+        toast.success(`¡Bienvenido de nuevo!`);
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      console.error('Login error:', err);
       toast.error('Ocurrió un error al iniciar sesión');
       return false;
     }
