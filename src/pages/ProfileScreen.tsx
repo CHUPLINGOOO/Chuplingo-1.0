@@ -3,34 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { AppHeader } from '../components/layout/AppHeader';
 import { useChuplingo } from '../context/ChuplingoContext';
 import { ChuplingoMascot, AVATAR_OPTIONS } from '../components/mascot/ChuplingoMascot';
-import {
-  Flame,
-  Star,
-  Award,
-  Target,
-  Volume2,
-  Shield,
-  RotateCcw,
-  ChevronRight,
-  Edit2,
-  Check,
-  CreditCard,
-  Download,
-  LogOut,
-  Smartphone,
-  Moon,
-  Sun,
-  Camera,
-  X
-} from 'lucide-react';
-import { LEVEL_THRESHOLDS } from '../data/coursesData';
-import { toast } from 'sonner';
-
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AppHeader } from '../components/layout/AppHeader';
-import { useChuplingo } from '../context/ChuplingoContext';
-import { ChuplingoMascot, AVATAR_OPTIONS } from '../components/mascot/ChuplingoMascot';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Flame, 
@@ -50,6 +22,7 @@ import {
   Moon,
   Sun,
   Camera,
+  Users,
   X
 } from 'lucide-react';
 import { LEVEL_THRESHOLDS } from '../data/coursesData';
@@ -84,6 +57,7 @@ const ProfileScreen: React.FC = () => {
 
   // Security modals state
   const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [showCreatorsModal, setShowCreatorsModal] = useState(false);
   const [newEmailInput, setNewEmailInput] = useState('');
   const [oldPasswordInput, setOldPasswordInput] = useState('');
   const [newPasswordInput, setNewPasswordInput] = useState('');
@@ -515,7 +489,7 @@ const ProfileScreen: React.FC = () => {
         <motion.button
           variants={itemVariants}
           onClick={() => setShowSecurityModal(!showSecurityModal)}
-          className="w-full py-3.5 px-4 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-[#183153] dark:text-white font-bold text-xs border border-slate-200 dark:border-slate-700 flex items-center justify-between"
+          className="w-full py-3.5 px-4 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-[#183153] dark:text-white font-bold text-xs border border-slate-200 dark:border-slate-700 flex items-between justify-between"
         >
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-[#F05C54]" />
@@ -574,6 +548,90 @@ const ProfileScreen: React.FC = () => {
                     Guardar nueva contraseña
                   </button>
                 </form>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Creators / Team Section */}
+        <motion.button
+          variants={itemVariants}
+          onClick={() => setShowCreatorsModal(!showCreatorsModal)}
+          className="w-full py-3.5 px-4 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-[#183153] dark:text-white font-bold text-xs border border-slate-200 dark:border-slate-700 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-[#7354D9]" />
+            <span>Creadores de Chuplingo</span>
+          </div>
+          <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${showCreatorsModal ? 'rotate-90' : ''}`} />
+        </motion.button>
+
+        <AnimatePresence>
+          {showCreatorsModal && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-purple-50/50 dark:bg-purple-950/20 rounded-2xl border border-purple-100 dark:border-purple-900/50 flex flex-col overflow-hidden"
+            >
+              <div className="p-4 flex flex-col gap-3">
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#7354D9] mt-1.5 shrink-0" />
+                    <div>
+                      <p className="text-[11px] font-black text-[#183153] dark:text-white">Mauricio Aymituma Cervantes</p>
+                      <p className="text-[10px] text-[#7354D9] font-bold">Programación</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#7354D9] mt-1.5 shrink-0" />
+                    <div>
+                      <p className="text-[11px] font-black text-[#183153] dark:text-white">Diego Aaron Flores Huamani</p>
+                      <p className="text-[10px] text-[#7354D9] font-bold">Programación</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#7354D9] mt-1.5 shrink-0" />
+                    <div>
+                      <p className="text-[11px] font-black text-[#183153] dark:text-white">Lardy Tomas Montes Corrales</p>
+                      <p className="text-[10px] text-[#7354D9] font-bold">Diseño y Publicidad</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#7354D9] mt-1.5 shrink-0" />
+                    <div>
+                      <p className="text-[11px] font-black text-[#183153] dark:text-white">Danilo Amir Christian Palacios Rojas</p>
+                      <p className="text-[10px] text-[#7354D9] font-bold">Programación</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#7354D9] mt-1.5 shrink-0" />
+                    <div>
+                      <p className="text-[11px] font-black text-[#183153] dark:text-white">Enzo Adriano Zuñiga Bolivar</p>
+                      <p className="text-[10px] text-[#7354D9] font-bold">Diseño y Publicidad</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-purple-100 dark:border-purple-900/50 mt-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Agradecimientos Especiales</p>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-start gap-3 opacity-80">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 shrink-0" />
+                        <div>
+                          <p className="text-[11px] font-black text-[#183153] dark:text-white">Joaquin Gabriel Yañez Vilca</p>
+                          <p className="text-[10px] text-slate-500 font-bold">Sujeto de pruebas</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 opacity-80">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 shrink-0" />
+                        <div>
+                          <p className="text-[11px] font-black text-[#183153] dark:text-white">Nicolas Manhaes Farfan</p>
+                          <p className="text-[10px] text-slate-500 font-bold">Sujeto de pruebas</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}

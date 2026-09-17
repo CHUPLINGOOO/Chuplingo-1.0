@@ -637,11 +637,40 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!isValidUUID(userId)) return;
 
     try {
-      const { data: profile } = await supabase
+      let { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
+
+      // Si no hay perfil, lo creamos automáticamente (Fix para registros que no dispararon el trigger)
+      if (!profile && !profileError) {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          const meta = authUser.user_metadata || {};
+          const newProfile = {
+            id: userId,
+            first_name: meta.first_name || meta.nombre || 'Estudiante',
+            last_name: meta.last_name || meta.apellido || 'Chuplingo',
+            avatar_url: 'parrot-classic',
+            xp: 0,
+            current_streak: 0,
+            best_streak: 0,
+            daily_goal: 20,
+            plan: 'GRATIS',
+            role: 'student',
+            updated_at: new Date().toISOString()
+          };
+
+          const { data: insertedProfile } = await supabase
+            .from('profiles')
+            .upsert(newProfile, { onConflict: 'id' })
+            .select('*')
+            .maybeSingle();
+
+          if (insertedProfile) profile = insertedProfile;
+        }
+      }
 
       if (profile) {
         const { level, title } = calculateLevelInfo(profile.xp || 0);
@@ -922,18 +951,33 @@ export const ChuplingoProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       const isConfirmed = !!authData.user?.email_confirmed_at;
-      setUser(prev => ({
-        ...prev,
-        id: authData.user?.id || `user-${Date.now()}`,
-        nombre: data.nombre.trim(),
-        apellido: data.apellido.trim(),
-        email: emailNorm,
-        emailVerificado: isConfirmed,
-        onboardingCompletado: true
-      }));
+      const finalUserId = authData.user?.id;
 
-      setIsAuthenticated(true);
-      toast.success('¡Registro exitoso! Revisa tu correo de confirmación.');
+      if (finalUserId) {
+        setUser(prev => ({
+          ...prev,
+          id: finalUserId,
+          nombre: data.nombre.trim(),
+          apellido: data.apellido.trim(),
+          email: emailNorm,
+          emailVerificado: isConfirmed,
+          onboardingCompletado: true
+        }));
+
+        setIsAuthenticated(true);
+
+        // Intentar crear el perfil inmediatamente
+        await supabase.from('profiles').upsert({
+          id: finalUserId,
+          first_name: data.nombre.trim(),
+          last_name: data.apellido.trim(),
+          role: 'student',
+          plan: 'GRATIS',
+          xp: 0
+        });
+      }
+
+      toast.success('¡Registro exitoso! Revisa tu correo si es necesario.');
       return true;
     } catch {
       toast.error('Ocurrió un problema de conexión al registrarse');
